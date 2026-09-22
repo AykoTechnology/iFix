@@ -1,20 +1,17 @@
+<!-- GERADO POR scripts/sync-adrs.mjs — NÃO EDITAR À MÃO.
+     A fonte é docs/ESM_ITSM_PLATFORM_SPEC.md § 9. Edite lá e rode: node scripts/sync-adrs.mjs -->
+
 # ADR-004: Motor de Workflows Declarativo Zero-Code em JSON DSL
 
 - **Status:** Aprovado
-- **Data:** 2026-09-22
+- **Decisão:** Fluxos de trabalho são representados como *statecharts* em JSON validados via Zod e interpretados por um motor determinístico em Node.js.
+- **Consequências:**
+  - Impede injeção de scripts arbitrários pelos usuários, mantém a retrocompatibilidade durante atualizações de versão e preserva a conformidade com as regras do PinkVERIFY.
+  - `[+]` A UI do FlowBuilder é a **única** superfície de autoria; o JSON aparece ao usuário apenas como representação somente-leitura. Não existe campo de texto livre que aceite DSL.
+  - `[+]` Instâncias em execução permanecem vinculadas à versão do fluxo sob a qual nasceram, até sua conclusão natural. O motor precisa executar N versões simultaneamente — migrar instâncias vivas entre versões é proibido por padrão.
+  - `[+]` Publicação exige *dry-run* aprovado (integridade referencial: estado órfão, transição sem destino, condição sobre campo inexistente). Não é passo opcional do fluxo de publicação.
+  - `[+]` O motor de workflow **orquestra estado e aprovação**; ele não avalia condições por conta própria — delega ao BRE (ADR-006). A fronteira entre os dois é a diferença entre "o que acontece depois" e "sob qual condição".
 
-## Contexto
+---
 
-Fluxos de aprovação, transições de estado de chamado e regras de SLA precisam ser configuráveis por administradores de negócio sem deploy de código, mantendo conformidade com os processos auditáveis PinkVERIFY e sem abrir superfície de execução de código arbitrário.
-
-## Decisão
-
-Workflows são representados como statecharts em JSON, validados por schema Zod, e interpretados por um motor determinístico em Node.js. A UI do FlowBuilder (tela de referência 04) é a única forma de autoria — o JSON gerado é sempre somente-leitura para o usuário final, nunca um campo de texto livre editável.
-
-## Consequências
-
-- Impede injeção de scripts arbitrários pelos usuários (proibição expressa de `eval()`/interpretadores dinâmicos — ver Regras de Ouro).
-- Mantém retrocompatibilidade durante atualizações de versão: cada workflow publicado carrega uma versão (`reembolso.v4`) e o motor precisa suportar execução de instâncias em andamento criadas sob versões anteriores até sua conclusão natural.
-- Toda publicação de workflow passa por validação `dry-run` (verificação de integridade referencial: estados órfãos, transições sem destino, condições referenciando campos inexistentes) antes de ficar disponível em produção — não é opcional, é parte do fluxo de publicação.
-- O motor de workflow **não é** o motor de regras de negócio genérico (ver ADR-006) — workflow orquestra *estado e aprovação*; regras de negócio avaliam *condições reutilizáveis* (elegibilidade, roteamento, SLA). Um bloco de "Condição" no FlowBuilder invoca o motor de regras, não reimplementa lógica de condição própria.
-- Preserva conformidade com as 25 categorias de processo auditável PinkVERIFY, já que cada transição de estado é um evento versionado e auditável por construção.
+Contexto completo, backlog relacionado e demais decisões: `docs/ESM_ITSM_PLATFORM_SPEC.md`.

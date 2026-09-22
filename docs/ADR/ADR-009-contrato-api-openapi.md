@@ -1,20 +1,17 @@
-# ADR-009: Contrato de API "Contract-First" via Zod → OpenAPI
+<!-- GERADO POR scripts/sync-adrs.mjs — NÃO EDITAR À MÃO.
+     A fonte é docs/ESM_ITSM_PLATFORM_SPEC.md § 9. Edite lá e rode: node scripts/sync-adrs.mjs -->
 
-- **Status:** Proposto
-- **Data:** 2026-09-22
-- **Contexto de origem:** DoD original exige "esquemas OpenAPI atualizados" como item de conclusão, mas não define como evitar que a documentação diverja do código — risco real em qualquer time que mantém spec manualmente.
+# ADR-009: Governança Contract-First via Schemas Zod Gerando OpenAPI 3.1
 
-## Contexto
+- **Status:** Aprovado
+- **Decisão:** Elimina-se a escrita manual de documentação OpenAPI. O contrato de interface é definido estritamente através de schemas TypeScript com Zod em `/src/shared`. A documentação OpenAPI 3.1 e as definições TypeScript dos clientes de frontend são geradas automaticamente no build através de `@fastify/swagger` integrado ao `@fastify/type-provider-zod`.
+- **Consequências:**
+  - Elimina integralmente o risco de desvio (*drift*) entre a especificação da API e a implementação real em produção. A validação de *payloads* na entrada da rota é garantida em tempo de execução pelos mesmos schemas que geram a documentação.
+  - `[+]` O `openapi.json` gerado é versionado no repositório justamente para que a mudança de contrato apareça como *diff* no PR — é o sinal que dispara a discussão sobre compatibilidade. O gate 6 da §6.4 falha se o arquivo versionado divergir do gerado.
+  - `[+]` Mudança incompatível de contrato exige versionamento de rota (`/v2/...`) e período de convivência declarado. Como a API é consumida por integrações de clientes (Épico 15.1), quebrar contrato silenciosamente quebra sistemas de terceiros.
+  - `[+]` Rotas internas/administrativas são marcadas explicitamente e excluídas da especificação pública distribuída a parceiros — a geração automática publicaria tudo por padrão.
+  - `[+]` O cliente TypeScript do frontend é gerado a partir do mesmo contrato; escrever chamada `fetch` manual para rota já contratada é desvio de padrão detectável em revisão.
 
-A plataforma tem múltiplos consumidores do mesmo contrato de API: o frontend React, um SDK público (para integrações de clientes ESM) e, futuramente, parceiros de integração (Slack/Teams, ferramentas de monitoramento alimentando o AIOps). Um contrato desalinhado entre implementação e documentação quebra confiança e integrações silenciosamente.
+---
 
-## Decisão
-
-Toda rota Fastify declara seu schema de entrada/saída em Zod (já mandatório pela spec); usar `zod-to-openapi` para gerar o documento OpenAPI 3.1 automaticamente a partir desses schemas no build, publicado em `docs/api/openapi.json` e servido em `/docs` pela própria API em ambientes não-produtivos. Nenhum endpoint entra em produção sem passar por essa geração (o build falha se um schema Zod não puder ser convertido).
-
-## Consequências
-
-- Elimina o risco de "documentação desatualizada" por construção — o contrato é derivado do código, nunca escrito à mão em paralelo.
-- Permite gerar um SDK TypeScript de cliente automaticamente a partir do OpenAPI para o frontend e para integrações externas (reduz erro manual de tipagem entre `src/web` e `src/api`).
-- Breaking changes de contrato ficam visíveis em diff de PR (o `openapi.json` gerado muda), servindo como sinal para exigir versionamento de rota (`/v2/...`) quando necessário.
-- Rotas administrativas internas que não devem ser expostas publicamente precisam de tag explícita `internal` no schema para serem excluídas da spec pública distribuída a parceiros.
+Contexto completo, backlog relacionado e demais decisões: `docs/ESM_ITSM_PLATFORM_SPEC.md`.

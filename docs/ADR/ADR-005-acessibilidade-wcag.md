@@ -1,20 +1,17 @@
+<!-- GERADO POR scripts/sync-adrs.mjs — NÃO EDITAR À MÃO.
+     A fonte é docs/ESM_ITSM_PLATFORM_SPEC.md § 9. Edite lá e rode: node scripts/sync-adrs.mjs -->
+
 # ADR-005: Acessibilidade Universal como Critério de Bloqueio (WCAG 2.2 AA)
 
 - **Status:** Aprovado
-- **Data:** 2026-09-22
+- **Decisão:** Nenhum componente de interface é incorporado ao Design System sem validação automatizada e aprovação manual de conformidade com as diretrizes WCAG 2.2 Nível AA.
+- **Consequências:**
+  - Garante navegabilidade total via teclado, contraste cromático regulamentar e compatibilidade com leitores de tela em todos os módulos do sistema.
+  - `[+]` O mecanismo é o gate 7 da §6.4 (Axe-core por história de Storybook). Sem esse mecanismo, o ADR é uma intenção — por isso a História 11.5 é pré-requisito da Fase 0.
+  - `[+]` Axe-core **não** detecta as violações mais caras deste produto: cor como único portador de informação, ordem de foco ilógica e rótulo incorreto em contexto. Revisão manual de teclado e leitor de tela é item obrigatório do checklist de PR de UI (História 11.7).
+  - `[+]` Atualizações em tempo real (Realtime) são anunciadas em região `aria-live="polite"` e **nunca** movem o foco do analista — requisito específico de uma mesa de atendimento que recebe *push* constante.
+  - `[+]` Visualizações gráficas (mapa de dependências da CMDB, gráficos de analytics) exigem alternativa equivalente navegável e valores numéricos explícitos, não apenas a representação visual (Histórias 13.5 e 9.x).
 
-## Contexto
+---
 
-A plataforma atende usuários corporativos de todos os departamentos (incluindo RH e Facilities, tipicamente com maior diversidade de necessidades de acessibilidade que sistemas de TI puros) e pode estar sujeita a exigências regulatórias de acessibilidade digital dependendo do setor do cliente.
-
-## Decisão
-
-Nenhum componente de interface é incorporado ao Design System (`src/web/src/design-system/`) sem validação automatizada (Axe-core) e aprovação manual de conformidade com WCAG 2.2 Nível AA.
-
-## Consequências
-
-- Garante navegabilidade total via teclado, contraste cromático regulamentar e compatibilidade com leitores de tela em todos os módulos.
-- Todo componente novo no Storybook roda `@storybook/addon-a11y` (Axe-core) como gate — PR que introduz violação é bloqueado, não é um warning.
-- Testes E2E críticos (fila de chamados, formulário de catálogo, FlowBuilder) incluem passagem de navegação 100% por teclado como caso de teste, não só teste de mouse/clique.
-- Regra de produto derivada (ver `docs/design-system/README.md`): cor nunca é o único portador de informação (prioridade, status, SLA sempre com rótulo textual) — isso é verificado tanto por Axe (contraste) quanto por revisão manual (Axe não detecta "cor como única informação").
-- Toda tela nova exige registro de revisão manual de teclado/leitor de tela no PR (checklist do template, ver `.github/PULL_REQUEST_TEMPLATE.md`) antes do merge.
+Contexto completo, backlog relacionado e demais decisões: `docs/ESM_ITSM_PLATFORM_SPEC.md`.

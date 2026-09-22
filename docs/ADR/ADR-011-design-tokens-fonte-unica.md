@@ -1,20 +1,18 @@
-# ADR-011: Design Tokens como Fonte Única de Verdade
+<!-- GERADO POR scripts/sync-adrs.mjs — NÃO EDITAR À MÃO.
+     A fonte é docs/ESM_ITSM_PLATFORM_SPEC.md § 9. Edite lá e rode: node scripts/sync-adrs.mjs -->
+
+# ADR-011: Design Tokens Centralizados (tokens.json) como Fonte Única de UI
 
 - **Status:** Aprovado
-- **Data:** 2026-09-22
-- **Contexto de origem:** Formalização da prática já adotada ao transcrever o handoff do Claude Design para `docs/design-system/tokens.json` — necessária para não haver drift entre a intenção de design e o Tailwind config do frontend.
+- **Decisão:** Todas as propriedades visuais da interface (cores, tipografia, espaçamentos, elevações, bordas e estados interativos) são mantidas exclusivamente em `/design-system/tokens.json`. Utiliza-se Style Dictionary em pipeline automatizado para compilar o JSON em classes utilitárias estendidas do Tailwind CSS e variáveis CSS nativas (`:root`).
+- **Consequências:**
+  - Impede o desvio estético (*design drift*) entre protótipos de interface e o código em produção. Garante que os rácios de contraste exigidos pelo WCAG 2.2 AA sejam testados e validados na fonte antes da geração do CSS.
+  - `[+]` O arquivo adota o formato **DTCG** (*Design Tokens Community Group*, com `$value`/`$type`), suportado nativamente pelo Style Dictionary v4 — sem isso o pipeline mandatado por este ADR não teria entrada válida.
+  - `[+]` A validação de contraste roda sobre **ambos** os temas (claro e escuro) como teste automatizado na esteira (Épico 11.4), não como conferência visual.
+  - `[+]` Componente que use valor estético literal (`#723CEB`, `24px`) em vez de token é reprovado pelo gate 10 da §6.4.
+  - `[+]` Alteração de design entra primeiro em `/design-system/tokens.json`; propagar direto para o Tailwind ou para o componente é o caminho por onde o *drift* retorna.
+  - `[+]` **Risco material:** o design system especifica as famílias comerciais **Gilroy** e **Lufga**, e o protótipo recebido usa `Outfit` (Google Fonts) como substituta de renderização. A identidade tipográfica do produto depende de aquisição de licença de uso comercial e hospedagem própria (Épico 11.6) — questão jurídica e orçamentária, não técnica.
 
-## Contexto
+---
 
-O handoff de design chega como protótipo HTML/CSS estático (`.dc.html`), não como código de produção (ver `design-system-ifix/README.md` do bundle recebido). Sem um passo de tradução explícito e versionado, é fácil que implementadores copiem valores de cor/espaçamento ad-hoc diretamente do HTML do protótipo, criando divergência silenciosa ao longo do tempo.
-
-## Decisão
-
-`docs/design-system/tokens.json` é a única fonte de verdade para cor, tipografia, espaçamento, raio, elevação e regras de layout. `src/web/tailwind.config.ts` é gerado/sincronizado a partir desse arquivo (script determinístico, não edição manual paralela). Qualquer atualização de design entra primeiro em `docs/design-system/` (com atualização do handoff original arquivado, se houver nova versão), depois se propaga ao Tailwind config e aos componentes.
-
-## Consequências
-
-- PR que altera cor/espaçamento/raio diretamente em `src/web` sem alteração correspondente em `docs/design-system/tokens.json` é sinal de drift e deve ser rejeitado em revisão.
-- Componentes React não usam valores literais de cor/espaçamento (`#723CEB`, `24px`) — sempre a classe Tailwind/token derivado do tokens.json.
-- Novas telas de design (gap listado em `docs/design-system/screens.md`) devem produzir tokens novos (se houver) neste arquivo antes da implementação, não durante.
-- Tema claro e escuro compartilham a mesma estrutura de tokens com valores por tema (`color.dark`/`color.light`) — nenhum componente hardcoda qual tema está ativo; sempre consome a variável CSS/token resolvido.
+Contexto completo, backlog relacionado e demais decisões: `docs/ESM_ITSM_PLATFORM_SPEC.md`.

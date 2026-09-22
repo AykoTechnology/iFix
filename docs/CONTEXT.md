@@ -1,99 +1,125 @@
 # CONTEXT.md — Estado Vivo do Projeto iFix
 
-> Documento mestre de estado. Atualizado a cada módulo concluído. Se você é um agente de IA (Claude Code, Codex) ou um novo desenvolvedor, leia este arquivo inteiro antes de abrir um PR.
+> Documento mestre de **estado**. Se você é um agente de IA (Claude Code, Codex) ou um novo desenvolvedor, leia este arquivo inteiro antes de abrir um PR.
+>
+> Divisão de papéis: `docs/ESM_ITSM_PLATFORM_SPEC.md` responde *"o que decidimos construir e por quê"* (intenção). Este arquivo responde *"o que já existe e como está"* (realidade). Divergência entre os dois é esperada enquanto uma fase está em curso — divergência **não registrada** é o problema.
 
 ## 0. O que é o iFix
 
-Plataforma cloud-native de **ESM/ITSM** (Enterprise & IT Service Management), multi-domínio (TI, RH, Finanças, Instalações Físicas), construída do zero sobre Node.js 22 + TypeScript + Fastify + Supabase Self-Hosted, rodando em Kubernetes com imagens Distroless. Ver `docs/ESPECIFICACAO_TECNICA.md` para a spec original completa e `docs/BACKLOG.md` para o backlog de 12 épicos.
+Plataforma cloud-native de **ESM/ITSM** (Enterprise & IT Service Management), multi-domínio (TI, RH, Finanças, Instalações Físicas), construída do zero sobre Node.js 22 + TypeScript + Fastify + Supabase Self-Hosted, rodando em Kubernetes com imagens Distroless.
+
+- Especificação vigente: **`docs/ESM_ITSM_PLATFORM_SPEC.md`** (v2.0)
+- Backlog: 21 épicos em 8 fases — ver § 4 da especificação e `docs/BACKLOG.md` (índice de Issues)
+- Decisões: 19 ADRs — ver § 9 da especificação (`docs/ADR/` é gerado a partir dela)
 
 ## 1. Status atual
 
-**Fase:** 0 — Fundação (planejamento e scaffolding). Nenhum código de aplicação foi escrito ainda; este commit estabelece a estrutura de documentação viva, ADRs, backlog e scaffold de pastas do monorepo.
+**Fase:** 0 — Fundação (planejamento e scaffolding). **Nenhum código de aplicação foi escrito.** O que existe é a camada de documentação viva, os ADRs, o backlog, os tokens de design e o scaffold de pastas do monorepo.
 
 ### Módulos concluídos
-- Nenhum. Ver `docs/BACKLOG.md` § Mapa de fases para a ordem de implementação.
+Nenhum.
 
 ### Próximos passos imediatos (Fase 0)
-1. Inicializar `src/api` (Fastify + TypeScript estrito + Zod) com rota de health-check e `startupProbe`/`livenessProbe`/`readinessProbe` reais.
-2. Inicializar `supabase/migrations` com o schema base: `tenants`, `workspaces` (partição departamental), `people`, e o padrão de RLS de referência (ADR-003) que todas as tabelas futuras devem seguir.
-3. Gerar `src/web/tailwind.config.ts` a partir de `docs/design-system/tokens.json` (ADR-011).
-4. Subir Storybook em `src/web` com `@storybook/addon-a11y` (ADR-005) antes do primeiro componente.
-5. `Dockerfile` multi-estágio (ADR-001) e pipeline de CI mínimo (lint, typecheck, testes, build de imagem, Trivy).
+
+1. Inicializar `src/api` (Fastify + TypeScript estrito + Zod) com health-check e as três probes reais (`startupProbe`, `livenessProbe`, `readinessProbe`).
+2. Inicializar `supabase/migrations` com o schema base — `tenants`, `workspaces`, `people` — e o **padrão de RLS de referência** (ADR-003 + ADR-012) que toda tabela futura deve seguir. Este é o artefato mais importante da fase: ele define o formato que todas as migrações subsequentes copiam.
+3. Configurar o pipeline do Style Dictionary gerando `src/web/tailwind.config.ts` a partir de `/design-system/tokens.json` (ADR-011).
+4. Subir Storybook em `src/web` com `@storybook/addon-a11y` **antes do primeiro componente** — o ADR-005 só é bloqueante se existir o mecanismo que o bloqueia.
+5. `Dockerfile` multi-estágio (ADR-001) e esteira de CI com os 12 gates da § 6.4 da especificação.
+6. Instrumentação OpenTelemetry desde o primeiro endpoint (ADR-008) — retroinstrumentar depois custa mais e costuma não acontecer.
+
+**Marco de saída da Fase 0:** um endpoint em produção com RLS ativa, auditoria disparando, trace atravessando a fila e token de UI aplicado — ponta a ponta.
 
 ## 2. Fronteiras arquiteturais
 
 | Camada | Responsabilidade | Nunca faz |
 |---|---|---|
-| `src/api` | HTTP, validação de entrada (Zod), orquestração de casos de uso, publicação em filas `pgmq` | Lógica de negócio condicional complexa hardcoded (isso é do motor de regras, ADR-006) |
-| `src/workers` | Consumo de filas `pgmq`, jobs assíncronos idempotentes, correlação AIOps, notificações | Servir HTTP síncrono ao usuário final |
-| `src/web` | React 19 + Tailwind, consome API via cliente gerado do OpenAPI (ADR-009) | Acesso direto ao Postgres/Supabase (sempre via API) |
-| `src/shared` | Tipos TypeScript, schemas Zod, motor de regras (ADR-006), motor de workflow (ADR-004) — consumido por `api` e `workers` | Ter dependência de framework HTTP ou de UI |
-| `supabase/migrations` | Schema SQL versionado + políticas RLS (ADR-003) | Lógica de negócio em stored procedures complexas (exceto triggers de auditoria, ADR-007) |
+| `src/api` | HTTP, validação de entrada (Zod), orquestração de casos de uso, publicação em filas `pgmq` | Lógica condicional de negócio embutida (pertence ao BRE, ADR-006) |
+| `src/workers` | Consumo idempotente de filas, jobs assíncronos, correlação AIOps, notificações | Servir HTTP síncrono ao usuário final |
+| `src/web` | React 19 + Tailwind, consumindo a API pelo cliente gerado do OpenAPI (ADR-009) | Acessar Postgres/Supabase diretamente |
+| `src/shared` | Tipos, schemas Zod, motor de workflow (ADR-004), motor de regras (ADR-006) | Depender de framework HTTP ou de UI |
+| `supabase/migrations` | Schema SQL versionado + políticas RLS | Lógica de negócio em procedures (exceto triggers de auditoria, ADR-007) |
+| `/design-system` | Tokens DTCG compiláveis (ADR-011) | Conter componente, documentação longa ou saída de build editada à mão |
 
-## 3. Mapa de filas (`pgmq`) — vivo, atualizar a cada worker novo
+## 3. Mapa de filas (`pgmq`) — vivo
 
-| Fila | Produtor | Consumidor | Idempotência | Épico |
+**Nenhuma fila foi criada ainda.** As filas previstas estão na § 5.3 da especificação. Esta seção passa a listar o estado **real** a partir do primeiro worker implementado, com: nome, produtor, consumidor, chave de idempotência e estado da DLQ.
+
+| Fila | Produtor | Consumidor | Idempotência | Status |
 |---|---|---|---|---|
-| `notifications_outbox` | API/workers (qualquer evento de domínio) | `src/workers/src/notifications` | chave: `event_id` | 10 |
-| `incident_correlation` | API (criação/atualização de incidente) | `src/workers/src/aiops-correlation` | chave: `incident_id` + janela | 5 |
-| `rules_evaluation_audit` | Motor de regras (ADR-006) | `src/workers/src/audit-writer` (ou trigger direto, a decidir na implementação) | chave: `evaluation_id` | 7, 12 |
-| *(a preencher conforme implementação real substitui este placeholder)* | | | | |
+| — | — | — | — | nenhuma implementada |
 
-## 4. Mapa de tabelas core — vivo, atualizar a cada migração
+## 4. Mapa de tabelas core — vivo
 
-> Nenhuma migração foi criada ainda. Esta seção será preenchida à medida que `supabase/migrations` ganhar arquivos reais — mantida aqui como lembrete de que o mapa **precisa** existir antes do fim da Fase 0, não como documentação retroativa.
+**Nenhuma migração foi criada ainda.** O modelo de intenção está na § 5.2 da especificação. Esta seção passa a listar as tabelas **realmente criadas**, com a confirmação de RLS ativa e de gatilho de auditoria por tabela — é a evidência que a revisão de PR consulta.
 
-Tabelas fundacionais esperadas na Fase 0: `tenants`, `workspaces`, `people`, `roles`, `role_assignments`, `audit_log` (ADR-007), `business_rules` (ADR-006).
+| Tabela | Migração | RLS | Auditoria | Observação |
+|---|---|---|---|---|
+| — | — | — | — | nenhuma implementada |
 
 ## 5. Convenções ativas
 
 - **TypeScript estrito** (`strict: true`, sem `any` não justificado) em todo o monorepo.
-- **Zod é a única forma de validação de fronteira** — toda rota Fastify e todo schema de workflow/regra tem um schema Zod correspondente, que também alimenta o OpenAPI (ADR-009).
-- **Nomenclatura de IDs de negócio visíveis ao usuário**: `INC-xxxxx` (incidente), `REQ-xxxxx` (requisição), `CHG-xxxxx` (mudança), `PRB-xxxxx` (problema), `CI-xxx-xxxx` (item de configuração), `KB-xxxx` (artigo de conhecimento) — sempre renderizados em `JetBrains Mono` no frontend (ver `docs/design-system/tokens.json`).
-- **Branches de agente**: `agent/codex-*` para implementação (ver § 7 da spec técnica). Este scaffold inicial foi criado na branch `claude/itsm-esm-system-qxr9r2`.
-- **Commits**: mensagens descritivas focadas no "porquê"; um módulo de backlog por PR sempre que possível.
-- **Nenhum valor literal de design** (cor/espaçamento/raio) em componentes — sempre token de `docs/design-system/tokens.json` via Tailwind (ADR-011).
+- **Zod é a única validação de fronteira** — toda rota, workflow e regra tem schema Zod, que também gera o OpenAPI (ADR-009).
+- **IDs de negócio visíveis**: `INC-xxxxx`, `REQ-xxxxx`, `CHG-xxxxx`, `PRB-xxxxx`, `CI-xxx-xxxx`, `KB-xxxx` — sequência por locatário e por tipo (ADR-015), sempre renderizados em `JetBrains Mono`.
+- **Tempo**: persistência em `timestamptz` UTC; conversão de fuso apenas na apresentação (ADR-016).
+- **Chaves primárias**: UUID v7; o identificador legível é coluna separada.
+- **Nenhum valor literal de design** em componentes — sempre token de `/design-system/tokens.json` (ADR-011).
+- **Branches**: `agent/codex-*` (implementação), `claude/*` (revisão, conflito, scaffolding).
+- **Alterar um ADR**: editar a § 9 da especificação e rodar `node scripts/sync-adrs.mjs`. Nunca editar `docs/ADR/*.md` à mão — são gerados.
 
 ## 6. Regras de Ouro (bloqueantes de PR)
 
-1. **Imutabilidade Distroless** — nenhuma dependência de shell/SO; gravações locais só em `/tmp` (ADR-001).
-2. **RLS mandatório** — nenhuma tabela de negócio sem `ROW LEVEL SECURITY` ativa e testada (ADR-003).
-3. **Processamento idempotente** — todo consumidor `pgmq` trata mensagem duplicada sem corromper estado (ADR-002).
-4. **Zero scripts imperativos em regra de negócio** — proibido `eval()`/interpretador dinâmico; tudo via DSL declarativa (ADR-004) ou motor de regras (ADR-006).
-5. **Graceful shutdown** — `SIGTERM`/`SIGINT` drenam conexões, pausam consumo de fila e fecham pool de banco em até 30s (`terminationGracePeriodSeconds: 30`).
-6. **WCAG 2.2 AA é bloqueante**, não aspiracional (ADR-005).
-7. **Cor nunca é a única portadora de informação** (prioridade/status/SLA sempre com rótulo textual — regra de produto derivada do design system).
-8. **Toda mutação de negócio relevante é auditável** via `audit_log` (ADR-007) — se a tabela é sensível e não gera evento de auditoria, isso é um bug de design, não um detalhe de implementação.
+Texto completo e o gate de CI correspondente a cada uma: § 10.1 da especificação.
+
+1. Imutabilidade Distroless (ADR-001)
+2. RLS mandatório (ADR-003, ADR-012)
+3. Auditoria universal automática (ADR-007)
+4. Fonte única de contrato de API (ADR-009)
+5. Fonte única de UI (ADR-011)
+6. Processamento idempotente (ADR-002)
+7. Zero scripts imperativos em regra de negócio (ADR-004, ADR-006)
+8. Graceful shutdown em 30s
+9. Cor nunca é a única informação (ADR-005)
+10. Nenhum segredo versionado
+11. Observabilidade não é opcional (ADR-008)
 
 ## 7. Definição de Pronto (DoD)
 
-Um item de backlog só é "pronto" quando:
+13 critérios — texto completo na § 10.2 da especificação. Os quatro mais esquecidos na prática:
 
-1. TypeScript estrito com schemas Zod validados.
-2. Cobertura de testes unitários > 85%; testes de integração passam contra instância efêmera de banco.
-3. Políticas RLS versionadas em migração e testadas contra vazamento entre partições/tenants (ADR-003).
-4. Imagem Distroless com Trivy indicando zero CVEs com CVSS ≥ 7.0.
-5. Testes Axe-core aprovados sem violação WCAG 2.2 AA (ADR-005).
-6. `docs/CONTEXT.md` (este arquivo) e `docs/api/openapi.json` (ADR-009) atualizados.
-7. PR revisado e aprovado, com conflitos resolvidos limpamente contra `main`.
+- Teste de vazamento em **dois eixos**: entre locatários **e** entre espaços de serviço (ADR-012).
+- `traceparent` atravessando qualquer fronteira de fila introduzida (ADR-008).
+- Revisão manual de teclado e leitor de tela registrada no PR — Axe-core não cobre ordem de foco nem cor como única informação.
+- Campos com dado pessoal classificados e com retenção declarada (ADR-013).
 
 ## 8. Fluxo de agentes (Codex ⇄ Claude Code)
 
-1. Issue formal descreve demanda, contratos e critérios de aceite (ver Issues de épico no GitHub).
+1. Issue formal descreve demanda, contratos e critérios de aceite.
 2. Codex cria branch `agent/codex-*`, implementa, testa, abre PR.
-3. CI roda lint, SAST, testes, varreduras de segurança.
-4. Claude Code revisa arquitetura, impacto em regras de negócio e documentação viva.
-5. Conflitos com `main`: Claude Code resolve, roda suíte de integração, atualiza o PR.
-6. Merge via **Squash and Merge** após todos os gates aprovados.
+3. CI roda os 12 gates da § 6.4.
+4. Claude Code revisa arquitetura, impacto em regras de negócio, performance de RLS e documentação viva.
+5. Conflito com `main`: Claude Code concilia schemas e contratos, roda a integração, atualiza o PR.
+6. Merge via **Squash and Merge**.
+
+**Limites de autonomia** (§ 7.1 da especificação): agente de IA não aprova ADR, não aplica pacote de configuração em produção, não altera RLS em produção, não define base legal ou retenção de dado pessoal, não aceita risco de segurança ou de acessibilidade suprimindo achado.
 
 ## 9. Pendências abertas
 
-Ver `docs/BACKLOG.md` § "Pendências levantadas na análise" — licenciamento de fontes, telas de design faltantes, política LGPD, escolha de vendors de observabilidade/e-mail/LLM.
+11 riscos e decisões em aberto (R1–R11) na § 12 da especificação. Os que bloqueiam a Fase 0:
+
+- **R1** — licenciamento das fontes comerciais Gilroy e Lufga (hoje o protótipo usa Outfit como substituta).
+- **R3** — política de retenção e base legal LGPD por categoria de dado (classificação precisa existir antes do primeiro schema com dado pessoal).
+- **R6** — destino de exportação da observabilidade (coletor OTLP).
+- **R11** — licença do repositório.
 
 ## 10. Referências
 
-- `docs/ESPECIFICACAO_TECNICA.md` — spec técnica original completa (arquitetura, stack, ADRs 001–005 na origem, DoD original).
-- `docs/BACKLOG.md` — 12 épicos, fases, pendências.
-- `docs/ADR/` — decisões arquiteturais (001–011).
-- `docs/design-system/` — tokens, componentes, telas de referência.
-- `docs/PLAYBOOKS/INCIDENTS_LEARNING.md` — causa-raiz de falhas de teste/incidentes e regras derivadas.
+| Documento | Papel |
+|---|---|
+| `docs/ESM_ITSM_PLATFORM_SPEC.md` | Especificação vigente (v2.0): arquitetura, backlog, ADRs, NFRs, riscos |
+| `docs/BACKLOG.md` | Índice de fases e Issues |
+| `docs/ADR/` | Registros individuais (**gerados** pelo `scripts/sync-adrs.mjs`) |
+| `/design-system/tokens.json` | Tokens DTCG compiláveis |
+| `docs/design-system/` | Documentação de design: componentes e telas de referência |
+| `docs/PLAYBOOKS/INCIDENTS_LEARNING.md` | Causa-raiz de falhas e regras derivadas |

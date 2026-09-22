@@ -5,14 +5,14 @@ Este repositório é desenvolvido por um par de agentes de IA coordenados (Codex
 ## Antes de abrir um PR
 
 1. Leia `docs/CONTEXT.md` inteiro — é o documento vivo de estado do projeto.
-2. Confirme que sua mudança está associada a uma história do `docs/BACKLOG.md` (ou abra uma Issue de bug/ADR usando os templates em `.github/ISSUE_TEMPLATE/`).
-3. Releia as **Regras de Ouro** (`docs/CONTEXT.md` § 6) — são bloqueantes, não sugestões.
+2. Confirme que sua mudança está associada a uma história da § 4 de `docs/ESM_ITSM_PLATFORM_SPEC.md` (índice de Issues em `docs/BACKLOG.md`), ou abra uma Issue usando os templates em `.github/ISSUE_TEMPLATE/`.
+3. Releia as **Regras de Ouro** (§ 10.1 da especificação) — são bloqueantes, e cada uma tem um gate de CI que a verifica.
 
 ## Padrões de código
 
 - TypeScript estrito em todo o monorepo (`src/api`, `src/workers`, `src/web`, `src/shared`).
 - Validação de fronteira sempre via Zod — nunca `any` para dado externo.
-- Nenhum valor literal de design fora de `docs/design-system/tokens.json` (ADR-011).
+- Nenhum valor literal de design fora de `/design-system/tokens.json` (ADR-011).
 - Commits em português ou inglês, mas descritivos e focados no "porquê" da mudança.
 
 ## Branches

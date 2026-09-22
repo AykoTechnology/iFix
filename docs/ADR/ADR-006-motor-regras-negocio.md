@@ -1,25 +1,18 @@
-# ADR-006: Motor de Regras de Negócio Desacoplado do Motor de Workflow
+<!-- GERADO POR scripts/sync-adrs.mjs — NÃO EDITAR À MÃO.
+     A fonte é docs/ESM_ITSM_PLATFORM_SPEC.md § 9. Edite lá e rode: node scripts/sync-adrs.mjs -->
 
-- **Status:** Proposto
-- **Data:** 2026-09-22
-- **Contexto de origem:** Lacuna identificada na spec técnica original — "regras de negócio fluidas" foi um requisito explícito do briefing que não tinha componente arquitetural próprio.
+# ADR-006: Business Rules Engine (BRE) Desacoplado do Motor de Workflows
 
-## Contexto
+- **Status:** Aprovado
+- **Decisão:** Implementar um componente autônomo de avaliação de regras de negócio, totalmente desacoplado da máquina de estados do workflow. As regras são declaradas como estruturas JSON (árvore lógica com operadores `AND`, `OR`, `NOT`, comparações de campos e predicados temporais), avaliadas por um executor funcional puro em TypeScript.
+- **Consequências:**
+  - Permite que regras de cálculo de prioridade matricial, roteamento de filas, suspensão de SLAs e determinação de aprovadores sejam reutilizadas transversalmente em múltiplos fluxos de atendimento sem inflar a máquina de estados principal.
+  - `[+]` Dependência **unidirecional**: o workflow invoca o BRE; o BRE nunca invoca o workflow. Qualquer necessidade inversa indica que a lógica está no componente errado.
+  - `[+]` O avaliador é função pura, sem I/O — recebe fatos, devolve decisão. Isso o torna exaustivamente testável e é a razão pela qual sua cobertura de testes exigida é superior ao piso de 85% da DoD.
+  - `[+]` Toda avaliação é registrada com os fatos de entrada e o resultado (Épico 7.6): auditoria de **decisão**, não apenas de mutação. Sem isso, é impossível responder "por que este chamado foi roteado para este time em março".
+  - `[+]` Precedência, escopo e critério de parada precisam ser explícitos e visíveis ao autor da regra (Épico 7.5) — um motor de regras cuja ordem de avaliação é implícita produz comportamento imprevisível em produção.
+  - `[+]` Guia de decisão para o time: se a lógica responde *"sob qual condição"* e é reutilizável, é regra (BRE). Se responde *"o que acontece em seguida"* e é específica de um fluxo, é transição (workflow).
 
-O ADR-004 resolve orquestração de estado e aprovação (workflow). Mas várias decisões do produto são *condições reutilizáveis* que não pertencem à topologia de um fluxo específico: elegibilidade de SLA por criticidade de CI, roteamento automático por carga/skill do agente, elegibilidade de auto-aprovação por valor+departamento, ativação de recursos por tenant. Sem um motor próprio, essas regras tendem a virar `if` espalhados no código da API — o que viola a Regra de Ouro "Zero Scripts Imperativos em Regras de Negócio" tão logo cresçam em número.
+---
 
-## Decisão
-
-Criar um **Business Rules Engine (BRE)** como pacote em `src/shared/src/rules-engine/`, consumido tanto pela API quanto pelos workers, com as seguintes características:
-
-- Regras são registros em tabela `business_rules` (schema Zod: `condition` como árvore de expressão AST-JSON — `{ all: [...] } | { any: [...] } | { field, op, value }` —, `action`, `priority`, `scope` [tenant/workspace/global], `enabled`).
-- O motor de workflow (ADR-004) invoca o BRE para avaliar blocos de "Condição"; o BRE nunca invoca o motor de workflow (dependência unidirecional).
-- Editor visual de expressão (construtor "se/e/ou" por campo — não editor de texto) é a única forma de autoria, mesma filosofia zero-code do ADR-004.
-- Toda avaliação de regra é logada com o conjunto de fatos de entrada e o resultado (auditoria de decisão, não só de mutação) — ver ADR-007.
-- Regras suportam *dry-run* contra um payload de exemplo antes de ativação, no mesmo espírito do dry-run de workflow.
-
-## Consequências
-
-- Reduz duplicação: SLA, roteamento automático, elegibilidade de auto-aprovação e feature flags por tenant passam a usar a mesma primitiva, o mesmo editor visual e a mesma trilha de auditoria.
-- Exige que toda nova "decisão condicional" de produto comece pela pergunta "isso é uma regra reutilizável ou uma transição específica de um fluxo?" — documentado como guia de decisão em `docs/CONTEXT.md`.
-- Motor deve ser puro (sem I/O) para ser testável unitariamente com 100% das combinações de operador cobertas — é infraestrutura crítica, cobertura de teste exigida acima do piso geral de 85% do DoD.
+Contexto completo, backlog relacionado e demais decisões: `docs/ESM_ITSM_PLATFORM_SPEC.md`.

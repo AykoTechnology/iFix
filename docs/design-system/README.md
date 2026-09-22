@@ -4,11 +4,13 @@
 
 ## Arquivos
 
+Este diretório contém a **documentação** de design. O artefato **compilável** (tokens) vive em `/design-system/` na raiz do repositório, conforme a estrutura de monorepo da §6.1 da especificação.
+
 | Arquivo | Conteúdo |
 |---|---|
-| `tokens.json` | Cores, tipografia, espaçamento, raio, elevação, layout e critérios de acessibilidade em formato consumível (gera `tailwind.config` e tokens CSS). |
 | `components.md` | Inventário de componentes de UI com estados e regras de uso. |
 | `screens.md` | As 7 telas de referência prototipadas, mapeadas para módulos do produto e para os épicos do backlog. |
+| `/design-system/tokens.json` *(raiz)* | Cores, tipografia, espaçamento, raio, elevação, layout e acessibilidade no formato DTCG, compilados por Style Dictionary para o Tailwind e para variáveis CSS (ADR-011). |
 
 ## Princípios de marca
 

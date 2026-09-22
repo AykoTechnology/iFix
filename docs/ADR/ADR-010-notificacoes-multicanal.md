@@ -1,20 +1,18 @@
-# ADR-010: Notificações Multicanal Assíncronas via pgmq
+<!-- GERADO POR scripts/sync-adrs.mjs — NÃO EDITAR À MÃO.
+     A fonte é docs/ESM_ITSM_PLATFORM_SPEC.md § 9. Edite lá e rode: node scripts/sync-adrs.mjs -->
 
-- **Status:** Proposto
-- **Data:** 2026-09-22
-- **Contexto de origem:** A spec original menciona notificações apenas como bloco do FlowBuilder ("Notificação") sem definir a arquitetura de entrega — necessária para SLA, delegação, storm alert e aprovações.
+# ADR-010: Arquitetura Unificada de Notificações Multicanal e Webhooks Assinados
 
-## Contexto
+- **Status:** Aprovado
+- **Decisão:** Toda emissão de evento que requeira comunicação externa ou interna é direcionada para a fila dedicada `pgmq_notifications`. Um worker consome as mensagens e despacha para os provedores correspondentes: Microsoft Graph API para e-mails corporativos, canal WebSocket para a Central in-app e motor de Webhooks externos. Os webhooks de saída contam obrigatoriamente com assinatura criptográfica no cabeçalho `X-Signature-SHA256`, gerada a partir de chave secreta compartilhada do locatário.
+- **Consequências:**
+  - Desacopla o tempo de resposta das transações de usuário do tempo de entrega de mensagens de terceiros. Garante rastreabilidade, retentativas automáticas e integridade contra adulteração em integrações corporativas.
+  - `[+]` Nenhum módulo de negócio invoca provedor de e-mail diretamente: todos publicam na fila com um `event_type` padronizado. Isso preserva a consistência transacional do ADR-002 e mantém a idempotência centralizada em um único consumidor.
+  - `[+]` Falha de canal externo (provedor de e-mail indisponível) nunca bloqueia a notificação in-app nem o evento de negócio original. A Central in-app é a fonte de verdade de "lido/não lido"; os demais canais são cópias de melhor esforço.
+  - `[+]` A chave HMAC é por locatário e precisa de rotação suportada sem janela de indisponibilidade (período de aceitação de duas chaves) — ver Épico 12.6.
+  - `[+]` Sem controle de volume, o valor da notificação colapsa. Preferência por evento, *digest* e janela de silêncio (Épico 10.4) são parte do contrato de qualidade desta decisão, não melhoria futura.
+  - `[+]` A dependência do Microsoft Graph pressupõe cliente com tenant Microsoft 365. O adaptador SMTP genérico deve permanecer suportado como alternativa de primeira classe, sob o mesmo contrato de adaptador.
 
-Múltiplos eventos do domínio (SLA em risco, aprovação pendente, storm alert, artigo de KB sugerido, delegação prestes a expirar) precisam alcançar o usuário certo pelo canal certo (in-app sempre; e-mail, Slack/Teams ou push conforme preferência), sem acoplar o código de negócio a um provedor de envio específico.
+---
 
-## Decisão
-
-Todo evento de domínio que gera notificação publica uma mensagem na fila `pgmq` `notifications_outbox` (mesmo padrão idempotente do ADR-002). Um worker dedicado (`src/workers/src/notifications/`) resolve preferências do usuário (tabela `notification_preferences`: canal habilitado por tipo de evento) e despacha para adaptadores por canal (in-app via `notifications` table + Realtime; e-mail via SMTP/provedor; Slack/Teams via webhook de saída assinado). Central de notificações in-app é a fonte de verdade de "lido/não lido"; os demais canais são cópias de melhor esforço.
-
-## Consequências
-
-- Nenhum módulo de produto (workflow, SLA, delegação) chama um provedor de e-mail diretamente — todos publicam na mesma fila com um `event_type` padronizado, mantendo a Regra de Ouro de idempotência e a consistência transacional do ADR-002.
-- Preferências por usuário/tipo de evento evitam fadiga de notificação — obrigatório ter ao menos um agrupamento "digest" (resumo periódico) para eventos de baixa prioridade, não só notificação individual imediata.
-- Falha de entrega em canal externo (e-mail fora do ar) nunca bloqueia a notificação in-app nem o evento de negócio original — desacoplamento garantido pela fila.
-- Webhooks de saída (Slack/Teams) precisam de assinatura HMAC e política de retry com backoff, tratados como integração de Épico 10 (Notificações & Integrações), não como responsabilidade ad-hoc de cada módulo.
+Contexto completo, backlog relacionado e demais decisões: `docs/ESM_ITSM_PLATFORM_SPEC.md`.

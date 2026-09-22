@@ -18,6 +18,17 @@ Toda entrada nova é adicionada ao **topo** da lista (mais recente primeiro). Ne
 
 ---
 
+### 2026-09-22 — Gate de contrato de API aprovaria sempre, comparando documento vazio com documento vazio
+
+- **Sintoma**: ao inspecionar o `openapi.json` recém-gerado, o documento não continha **nenhuma** rota — ainda que as quatro estivessem registradas e respondendo nos testes.
+- **Causa-raiz**: plugins do Fastify carregam de forma assíncrona. O coletor de rotas do `@fastify/swagger` é um hook `onRoute`, e o registro foi feito com `void app.register(...)` seguido do registro síncrono das rotas. As rotas entraram antes de o plugin estar carregado, então o hook nunca as viu.
+- **Por que é grave além do incidente**: o gate 6 da esteira compara o `openapi.json` versionado com o gerado. Com ambos vazios, ele aprova — sempre. Um gate que nunca reprova é indistinguível de gate nenhum, e o ADR-009 inteiro passaria a ser uma intenção documentada em vez de um contrato verificado. O defeito não produz erro, não produz aviso e não quebra teste algum: produz silêncio.
+- **Mitigação aplicada**: `buildServer` passou a ser assíncrona e a aguardar o registro do plugin antes de declarar as rotas.
+- **Regras novas**:
+  1. **Todo gate de comparação precisa de um teste que garanta conteúdo**, não apenas igualdade. `tests/api-http.test.ts` afirma que o documento descreve as rotas esperadas, que o schema de resposta foi derivado do Zod e que a rota de negócio está marcada como autenticada.
+  2. Ao adicionar um gate novo à esteira, perguntar explicitamente: **qual é o estado em que este gate aprovaria por vacuidade?** Se existir, ele precisa de uma asserção que o exclua.
+- **Referência**: `src/api/src/server.ts`, `tests/api-http.test.ts`, ADR-009.
+
 ### 2026-09-22 — Suíte de vazamento ficaria verde sem provar nada, por estado residual de cluster
 
 - **Sintoma**: após uma rodada de verificação por mutação, a execução de baseline voltou com 12 de 23 testes falhando — mesmo com o banco recriado do zero e nenhuma alteração no código.

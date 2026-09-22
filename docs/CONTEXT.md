@@ -25,15 +25,17 @@ Plataforma cloud-native de **ESM/ITSM** (Enterprise & IT Service Management), mu
 | **Suíte de vazamento**          | 23 testes contra PostgreSQL real, verificados por mutação — cada teste foi visto falhando quando a proteção que afirma verificar é removida           |
 | **Tooling do monorepo**         | npm workspaces, TypeScript estrito, ESLint (com as regras que sustentam as Regras de Ouro 7 e 11), Prettier, Vitest                                   |
 | **Contrato de claims**          | `src/shared` — `jwtClaimsSchema` é o contrato entre autenticação e políticas RLS, validado antes de virar GUC                                         |
+| **API HTTP**                    | `src/api` — Fastify, as três probes da § 6.3, autenticação JWT, `GET /v1/people` e graceful shutdown em 25s                                           |
+| **Contexto transacional**       | `withRequestContext` aplica claims com `SET LOCAL`, de modo que morram no commit e não vazem para a próxima requisição da mesma conexão de pool       |
+| **Contrato OpenAPI**            | `docs/api/openapi.json` derivado dos schemas Zod, com gate 6 verificando drift                                                                        |
 
 ### Próximos passos imediatos (Fase 0)
 
-1. **`src/api`** — Fastify + Zod, health-check e as três probes reais (`startupProbe`, `livenessProbe`, `readinessProbe`), aplicando o contexto de requisição por transação (`applyContext` equivalente ao de `tests/helpers/db.ts`).
-2. **OpenTelemetry** desde o primeiro endpoint (ADR-008), com o `traceparent` alimentando a GUC `app.trace_id` que a auditoria já lê.
-3. **Geração do OpenAPI** a partir dos schemas Zod e o gate 6 (drift de contrato).
-4. **Pipeline do Style Dictionary** gerando `src/web/tailwind.config.ts` a partir de `/design-system/tokens.json` (ADR-011).
-5. **Storybook** com `@storybook/addon-a11y` **antes do primeiro componente** — o ADR-005 só é bloqueante se existir o mecanismo que o bloqueia.
-6. **`Dockerfile`** multi-estágio (ADR-001) e a esteira de CI com os 12 gates da § 6.4.
+1. **OpenTelemetry completo** (ADR-008). Hoje o `trace-id` do `traceparent` já vira `reqId` do Fastify e chega à trilha de auditoria pela GUC `app.trace_id`; falta o SDK com exportador OTLP — **bloqueado pelo R6**, que define o destino.
+2. **Pipeline do Style Dictionary** gerando `src/web/tailwind.config.ts` a partir de `/design-system/tokens.json` (ADR-011).
+3. **Storybook** com `@storybook/addon-a11y` **antes do primeiro componente** — o ADR-005 só é bloqueante se existir o mecanismo que o bloqueia.
+4. **`Dockerfile`** multi-estágio (ADR-001) e a esteira de CI reunindo os 12 gates da § 6.4.
+5. **Fila `pgmq`** para fechar o marco de saída, que exige trace atravessando a fila.
 
 **Marco de saída da Fase 0:** um endpoint em produção com RLS ativa, auditoria disparando, trace atravessando a fila e token de UI aplicado — ponta a ponta.
 

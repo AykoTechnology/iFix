@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Versão** | 2.0 |
+| **Versão** | 2.1 |
 | **Data** | 2026-09-22 |
 | **Status** | Vigente — substitui integralmente a v1.0 (`docs/ESPECIFICACAO_TECNICA.md`) |
 | **Escopo** | Arquitetura de referência, backlog estratégico, contratos de engenharia, decisões arquiteturais e modelo de governança |
@@ -28,7 +28,7 @@ Itens prefixados com **`[+]`** foram **acrescentados na reanálise de 2026-09-22
 | Arquitetura de dados | `[+]` §5 inteira: modelo de dados núcleo, mapa de filas `pgmq`, convenções de particionamento e retenção |
 | Requisitos não-funcionais | `[+]` §11 inteira: SLOs, orçamento de performance, premissas de capacidade, matriz de navegadores e leitores de tela, limites de API |
 | Esteira | `[+]` Enumeração explícita dos 12 gates de CI, incluindo os que tornam mecânicas as Regras de Ouro (verificação de RLS em tabela nova, drift de OpenAPI, auditoria de tokens) |
-| Riscos | `[+]` §12: decisões bloqueantes em aberto, incluindo o licenciamento das fontes Gilroy/Lufga e a confirmação do escopo de certificação PinkVERIFY |
+| Riscos | `[+]` §12: decisões bloqueantes em aberto (R2–R11), com registro do que já foi encerrado em §12.1 |
 
 ### 0.3. Documentos relacionados
 
@@ -269,7 +269,7 @@ A matriz expôs **nove processos declarados no §1 que não possuíam nenhuma hi
 - **História 11.3**: Bloqueio de CI para classes utilitárias arbitrárias do Tailwind que violem os limites semânticos dos tokens estabelecidos.
 - **`[+]` História 11.4 — Paridade de Tema**: Tema claro e escuro definidos como pares de token no mesmo arquivo, com teste automatizado de contraste executado sobre **ambos** os temas na esteira. O design system entrega superfícies para os dois temas; validar apenas o escuro deixaria metade da interface sem garantia de conformidade.
 - **`[+]` História 11.5 — Biblioteca de Componentes**: Storybook como vitrine e superfície de teste dos componentes, com `@storybook/addon-a11y` executando Axe-core por história e bloqueio de merge em caso de violação (operacionaliza o ADR-005, que hoje é uma regra sem mecanismo).
-- **`[+]` História 11.6 — Definição Tipográfica**: Encerrar o **R1** (§ 12.1) e hospedar localmente (`@font-face` self-hosted) a família definitiva, seja ela licenciada ou OFL. O protótipo carrega apenas `Outfit` e `JetBrains Mono`; **Gilroy** e **Lufga** estão declaradas na pilha CSS mas nunca são baixadas, então provavelmente já foi a Outfit que se revisou e aprovou. A primeira tarefa é confirmar isso com quem aprovou — pode encerrar o risco sem custo. Se a decisão for licenciar, o escopo depende do **R9(a)**: SaaS e on-premises exigem licenças de naturezas diferentes (a segunda implica redistribuição a terceiros).
+- **`[+]` História 11.6 — Hospedagem Própria das Fontes**: Servir **Outfit** e **JetBrains Mono** pela própria aplicação via `@font-face` (WOFF2, subconjuntos `latin` e `latin-ext`, `font-display: swap`, *preload* da fonte de corpo), conforme o **ADR-020**. Remover qualquer referência a `fonts.googleapis.com` — a dependência de CDN externo quebra implantação sem saída para a internet e transmite o IP de cada usuário a um terceiro. Verificar na implementação se a Outfit oferece numerais tabulares; caso não, aplicar `font-variant-numeric: tabular-nums` e validar o alinhamento de SLA em coluna na fila de chamados.
 - **`[+]` História 11.7 — Regras de Produto Derivadas do Design**: Tornar verificáveis as regras que o Axe-core não detecta — cor nunca como único portador de informação (prioridade, SLA e estado sempre com rótulo textual), alvo mínimo de 44×44 px e uso do gradiente de marca limitado a um destaque por tela.
 
 #### Épico 12: Observabilidade de Produção, Hardening e Disaster Recovery (DR)
@@ -669,7 +669,7 @@ Em caso de divergência entre fontes, a ordem de autoridade é:
   - `[+]` A validação de contraste roda sobre **ambos** os temas (claro e escuro) como teste automatizado na esteira (Épico 11.4), não como conferência visual.
   - `[+]` Componente que use valor estético literal (`#723CEB`, `24px`) em vez de token é reprovado pelo gate 10 da §6.4.
   - `[+]` Alteração de design entra primeiro em `/design-system/tokens.json`; propagar direto para o Tailwind ou para o componente é o caminho por onde o *drift* retorna.
-  - `[+]` **Risco material (R1, § 12.1):** os tokens declaram as famílias comerciais **Gilroy** e **Lufga**, mas o protótipo recebido **não as carrega** — o único `<link>` de fonte traz `Outfit` e `JetBrains Mono`, e não há `@font-face` algum. As duas comerciais só renderizam em máquina que já as tenha instalada, o que torna provável que a identidade aprovada já seja a Outfit. Enquanto o R1 não se encerra, os tokens mantêm as comerciais como primeiro nome da pilha e a Outfit como *fallback* efetivo — situação que precisa ser resolvida, e não normalizada, porque a fonte que renderiza hoje depende da máquina de quem olha.
+  - `[+]` A definição tipográfica do sistema está no **ADR-020** (Outfit e JetBrains Mono, SIL OFL, self-hosted). Os tokens `font.family.*` são o único lugar onde ela é declarada.
 
 ### `[+]` ADR-012: Modelo de Tenancy em Dois Níveis — Locatário e Espaço de Serviço
 
@@ -799,6 +799,23 @@ Em caso de divergência entre fontes, a ordem de autoridade é:
 
 ---
 
+### `[+]` ADR-020: Tipografia Self-Hosted sob Licença Aberta
+
+- **Status:** Aprovado (2026-09-22) — encerra o risco R1
+- **Contexto:** O design system especificava **Gilroy** (títulos e números) e **Lufga** (interface e corpo), ambas famílias comerciais. A análise do bundle de handoff revelou que **nenhuma das duas é efetivamente carregada**: os arquivos `.dc.html` declaram um único `<link>` para o Google Fonts trazendo `Outfit` e `JetBrains Mono`, sem nenhuma declaração `@font-face`. As comerciais aparecem apenas como primeiros nomes da pilha CSS, renderizando somente em máquinas que já as tenham instaladas — ou seja, **a revisão de design ocorreu de fato em Outfit**. Licenciá-las exigiria resolver quatro dimensões de escopo (desktop × webfont, volume por *pageviews*, número de domínios e, decisivamente, redistribuição a terceiros no cenário on-premises), com custo indeterminado enquanto o modelo de entrega (R9) permanecer aberto.
+- **Decisão:**
+  - **Outfit** (SIL Open Font License 1.1) para display e corpo; **JetBrains Mono** (SIL OFL 1.1) para monoespaçado.
+  - Os tokens preservam `font.family.display` e `font.family.body` como entradas **semanticamente distintas**, ambas resolvendo para Outfit. Reintroduzir uma família de display no futuro passa a ser troca de valor de token, não refatoração de componente.
+  - **Hospedagem própria obrigatória**: as fontes são servidas pela própria aplicação via `@font-face`. É **proibido** consumir fontes de CDN de terceiros em tempo de execução, inclusive `fonts.googleapis.com`.
+  - Formato WOFF2, subconjuntos `latin` e `latin-ext`, `font-display: swap` e *preload* da fonte de corpo.
+- **Consequências:**
+  - Custo de licença zero e redistribuição permitida pela OFL: a imagem de contêiner pode transportar os arquivos de fonte sem restrição, o que **desacopla a tipografia do modelo de entrega** — o R9 deixa de ter efeito sobre ela.
+  - Elimina *egress* para `fonts.googleapis.com` em tempo de execução. Isso é pré-requisito para implantação on-premises ou em ambiente sem saída para a internet, e evita transmitir o endereço IP de cada usuário a um terceiro a cada carregamento de página — questão de tratamento de dados coerente com o ADR-013.
+  - A renderização deixa de depender do que está instalado na máquina de quem olha. Passa a ser **determinística para todos**, o que é pré-requisito para revisão de UI confiável, para testes visuais e para a validação de contraste da esteira (Épico 11.4).
+  - A hierarquia tipográfica passa a ser construída por **tamanho e peso**, não por contraste entre duas famílias. A escala de `font.size`/`font.weight` já sustenta isso; se o design concluir que falta contraste entre título e corpo, a correção é na escala ou na reintrodução de uma família de display, nunca em valor literal no componente (ADR-011).
+  - **Precedente que extrapola tipografia:** nenhum recurso estático de terceiros é consumido de CDN externo em tempo de execução. Vale para fontes, ícones e bibliotecas de frontend.
+  - A verificar na implementação (Épico 11.6): se a Outfit oferece numerais tabulares. A fila de chamados alinha tempos de SLA e contagens em coluna; sem `tnum` disponível, aplicar `font-variant-numeric: tabular-nums` e validar o resultado no componente de tabela.
+
 ## 10. Contratos de Engenharia, Regras de Ouro e Definição de Pronto (DoD)
 
 ### 10.1. Regras de Ouro da Engenharia
@@ -900,7 +917,6 @@ Itens que **bloqueiam** fases específicas e dependem de decisão externa à eng
 
 | # | Questão em aberto | Impacto se não resolvida | Bloqueia | Decisor |
 |---|---|---|---|---|
-| R1 | **Licenciamento das fontes Gilroy e Lufga** — famílias comerciais declaradas no design system, mas nunca carregadas pelo protótipo. Análise completa em **§ 12.1** | Custo de licença indeterminado (depende de R9) e possibilidade de o produto ir ao ar com tipografia diferente da que foi revisada | Épico 11.6 / Fase 0 | Produto + Jurídico |
 | R2 | **Escopo de certificação PinkVERIFY** — esquema-alvo, lista oficial de processos e se é requisito de lançamento | Afirmação de conformidade sem lastro em material comercial e em edital | §3, escopo das Fases 5–6 | Produto |
 | R3 | **Política de retenção e base legal LGPD** por categoria de dado | ADR-013 não implementável; risco jurídico direto em dados de RH | Fase 0 (classificação) e Fase 4 | Jurídico + DPO |
 | R4 | **Provedor de LLM e de *embeddings***, com vedação contratual de treinamento e definição de residência de dados | ADR-017 indefinido; custo por interação desconhecido | Épicos 3 e 5 / Fase 3 | Produto + Segurança |
@@ -908,45 +924,17 @@ Itens que **bloqueiam** fases específicas e dependem de decisão externa à eng
 | R6 | **Destino de observabilidade** (coletor OTLP, Prometheus e Grafana próprios ou gerenciados) | ADR-008 sem endereço de exportação; diagnóstico de produção fica cego | Fase 0 | Infra |
 | R7 | **Método de depreciação** (fiscal linear × gerencial saldo decrescente) e necessidade de manter as duas visões | Épico 8.2 com regra contábil incorreta — erro que só aparece em fechamento | Fase 5 | Contabilidade |
 | R8 | **Telas ausentes no design system**: autoria de schema de formulário, central de notificações, "Meus pedidos", login/SSO, editor de regras do BRE, relatórios | Implementação de UI sem referência aprovada, gerando retrabalho | Épicos 4.4, 7.1, 9.3, 10.2, 17.1, 18.1 | Design |
-| R9 | **Modelo de entrega e precificação** — (a) o iFix é SaaS hospedado por nós ou software instalado na infraestrutura do cliente? (b) precificação por analista, por colaborador ou por módulo | (a) bloqueia o R1, define se há redistribuição de artefatos de terceiros e afeta residência de dados; (b) define se módulos ESM são SKUs separados, mudando fronteiras técnicas e modelo de permissão | **(a) Fase 0** · (b) Fase 4 | Produto |
+| R9 | **Modelo de entrega e precificação** — (a) o iFix é SaaS hospedado por nós ou software instalado na infraestrutura do cliente? (b) precificação por analista, por colaborador ou por módulo | (a) define residência de dados, se há redistribuição de artefatos de terceiros e se a plataforma precisa operar sem saída para a internet; (b) define se módulos ESM são SKUs separados, mudando fronteiras técnicas e modelo de permissão | (a) Fase 3 (residência, via R4) · (b) Fase 4 | Produto |
 | R10 | **Estratégia de migração de dados** de ferramentas de ITSM existentes no cliente | Sem ela, cada implantação vira projeto artesanal de importação | Pré-GA | Produto + Serviços |
 | R11 | **Licença do repositório e política de código aberto/fechado** | Indefinição sobre contribuição externa e uso de dependências com licença viral | Fase 0 | Jurídico |
 
-### 12.1. `[+]` R1 em detalhe — licenciamento tipográfico
+### 12.1. `[+]` Riscos encerrados
 
-#### O achado
+Registro do que foi decidido e onde a decisão passou a viver. Mantido para que a pergunta não seja reaberta sem contexto.
 
-O bundle de handoff **não carrega Gilroy nem Lufga**. Os dois arquivos `.dc.html` declaram um único `<link>` para o Google Fonts, trazendo **`Outfit` e `JetBrains Mono`**, e não possuem nenhuma declaração `@font-face`. Gilroy e Lufga aparecem apenas como primeiros nomes da pilha CSS (`font-family:'Gilroy','Lufga','Outfit',system-ui,sans-serif`), o que significa que **só renderizam em máquinas que já as tenham instaladas localmente**.
-
-Consequência prática: se a revisão e a aprovação do design ocorreram no navegador, é provável que **a identidade tipográfica aprovada já seja a Outfit** — a menos que quem revisou tivesse as duas famílias comerciais instaladas. Confirmar isso com quem aprovou é a ação mais barata deste risco e pode encerrá-lo sem custo: se o que todos viram e validaram é Outfit, o R1 deixa de ser risco e vira apenas correção dos tokens.
-
-#### A questão não é permissão, é escopo de licença
-
-Gilroy (Fontfabric) e Lufga (Adam Ladd) são famílias **comerciais** — diferente de Outfit e JetBrains Mono, licenciadas sob SIL Open Font License. Comercial significa "requer a licença adequada", não "não pode ser usada". O que impede uma cotação imediata são quatro dimensões de escopo ainda indefinidas:
-
-1. **Licença desktop ≠ licença webfont.** A desktop cobre o designer produzindo o mockup. Servir o arquivo pela aplicação via `@font-face` exige licença de webfont separada, usualmente cobrada por faixa de *pageviews*.
-2. **Volume.** A premissa de capacidade da § 11.2 é de 50.000 colaboradores por locatário — volume que não se enquadra em faixa de entrada de licença metrificada.
-3. **Domínios.** Licenças de webfont costumam ser por domínio. Operação multilocatária com subdomínio por cliente, ou white-label, extrapola a licença padrão.
-4. **Redistribuição — a dimensão decisiva.** A arquitetura prevê Supabase Self-Hosted em cluster Kubernetes. **Se o produto for entregue para o cliente executar na própria infraestrutura, a imagem de contêiner carrega os arquivos de fonte junto — isso é distribuição a terceiros**, vedada pela quase totalidade das licenças de webfont padrão. O caso exige licença OEM/*embedding*, de ordem de grandeza superior.
-
-Por isso o R1 **depende do R9(a)**: enquanto não se decidir se o iFix é SaaS hospedado por nós ou software instalado no cliente, não há como cotar — são licenças de naturezas diferentes.
-
-#### Alternativas
-
-| Caminho | Implicação |
-|---|---|
-| **Licenciar Gilroy e Lufga** | Resolver R9(a) primeiro; cotar com a Fontfabric e com o distribuidor oficial de Lufga exigindo cobertura explícita de webfont, self-hosting e redistribuição (se on-premises). A Fontfabric disponibiliza um par gratuito de Gilroy (Light e ExtraBold), que **não** cobre os pesos Regular, Medium e Bold exigidos pelo design system |
-| **Manter Outfit** | SIL OFL: gratuita, self-hostable, redistribuível, sem métrica de uso. Custo e risco jurídico nulos — e provavelmente é o que já foi aprovado |
-| **Substituir por outra OFL** | Se houver objeção específica à Outfit: Manrope, Plus Jakarta Sans ou Figtree têm caráter geométrico próximo com amplitude de pesos mais completa |
-
-#### Critérios de avaliação tipográfica (para o design decidir)
-
-Independentemente do caminho, a escolha deve ser avaliada contra o uso real desta interface, e não apenas contra a identidade de marca:
-
-- **Altura-x e desambiguação** de `I` / `l` / `1` e `0` / `O` em legendas de 13 px — o produto é denso em identificadores (`INC-48192`, `CI-SRV-0231`) e opera sob WCAG 2.2 AA como critério de bloqueio (ADR-005).
-- **Numerais tabulares**, para alinhamento de tempos de SLA e contagens em coluna na fila de chamados.
-- **Amplitude de pesos** cobrindo Light/Regular/Medium/Bold, exigida pela escala tipográfica dos tokens.
-- Geométricas de *display* como Gilroy são projetadas para títulos; o design system já reconhece isso ao reservá-la para "títulos e números" e atribuir a interface à Lufga. Vale verificar se a família de corpo escolhida se sustenta em 13–15 px.
+| # | Questão | Resolução | Onde vive agora |
+|---|---|---|---|
+| **R1** | Licenciamento das fontes Gilroy e Lufga | **Encerrado em 2026-09-22.** Adotadas **Outfit** e **JetBrains Mono** (SIL OFL), self-hosted. A análise do handoff mostrou que as duas famílias comerciais nunca eram carregadas — não havia `@font-face` algum, e o único `<link>` de fonte trazia justamente Outfit e JetBrains Mono. Na prática, a revisão de design que as aprovou ocorreu renderizando Outfit. Licenciá-las custaria um valor indeterminado, dependente do modelo de entrega, para obter algo que ninguém chegou a ver | **ADR-020** |
 
 ---
 
@@ -979,4 +967,5 @@ Independentemente do caminho, a escolha deve ser avaliada contra o uso real dest
 |---|---|---|
 | 1.0 | 2026-09-22 | Documento original: visão, stack, Épicos 1–5, esteira, ADRs 001–005, Regras de Ouro e DoD |
 | 1.1 | 2026-09-22 | Expansão para Épicos 6–12 e ADRs 006–011 (BRE, auditoria, observabilidade/hardening/DR, contract-first, notificações, design tokens) |
+| 2.1 | 2026-09-22 | **R1 encerrado.** Adotadas Outfit e JetBrains Mono (SIL OFL), self-hosted — **ADR-020**, que também estabelece o precedente de não consumir recurso estático de terceiros via CDN externo em tempo de execução. R9 reformulado: perde a dependência tipográfica e deixa de bloquear a Fase 0. Nova §12.1 registra riscos encerrados |
 | **2.0** | **2026-09-22** | **Reanálise e consolidação.** Matriz de rastreabilidade dos 26 processos ITIL 2011 (§3) expondo processos declarados sem backlog; Épicos 13–21 criados para cobri-los, com destaque para CMDB e SSO, que haviam ficado órfãos; histórias `[+]` acrescentadas aos Épicos 1–12; ADRs 012–019 para decisões implícitas sem registro (tenancy em dois níveis, LGPD × auditoria imutável, anexos, numeração de registros, tempo e calendários, isolamento do RAG, testes, i18n); §5 arquitetura de dados; §6.4 gates de CI; §11 requisitos não-funcionais; §12 riscos e decisões em aberto; §13 glossário |

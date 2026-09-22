@@ -38,6 +38,7 @@ const SLUGS = {
   "017": "isolamento-rag",
   "018": "estrategia-testes",
   "019": "i18n-localizacao",
+  "020": "tipografia-self-hosted",
 };
 
 const spec = readFileSync(SPEC, "utf8");

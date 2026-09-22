@@ -22,13 +22,14 @@ Este diretório contém a **documentação** de design. O artefato **compilável
 
 ## Tipografia
 
-- **Gilroy** — títulos e números (Light/Regular/Medium/Bold).
-- **Lufga** — interface e corpo de texto (Regular/Medium).
+- **Outfit** — títulos, números, interface e corpo de texto (Light/Regular/Medium/Bold).
 - **JetBrains Mono** — números de chamado (`INC-48192`), IDs de CI (`CI-SRV-0231`), timestamps ISO 8601 e qualquer representação de schema JSON visível ao usuário.
 
-> **Atenção (risco R1 em aberto):** o protótipo **não carrega** Gilroy nem Lufga. O único `<link>` de fonte traz `Outfit` e `JetBrains Mono` do Google Fonts, sem nenhum `@font-face`. As duas famílias comerciais só renderizam em máquina que já as tenha instalada — na prática, o que se vê é **Outfit**, provavelmente inclusive na revisão que aprovou o design. Não tratar a pilha tipográfica como definitiva até o R1 ser encerrado: análise completa, alternativas e critérios de avaliação em `docs/ESM_ITSM_PLATFORM_SPEC.md` § 12.1.
+> **Nota histórica:** o design system original especificava **Gilroy** (display) e **Lufga** (corpo), ambas comerciais. O protótipo nunca as carregou — não havia `@font-face` algum, e o único `<link>` de fonte trazia Outfit e JetBrains Mono. Elas só renderizavam em máquina que já as tivesse instaladas, de modo que a revisão de design ocorreu de fato exibindo Outfit. O **ADR-020** formalizou Outfit como a família do sistema.
 
-Fallback de carregamento: `Outfit` (Google Fonts) + `system-ui, sans-serif`.
+Ambas as famílias são **self-hosted** (SIL OFL), servidas pela própria aplicação. Nenhuma fonte vem de CDN de terceiros em tempo de execução — ver `design-system/README.md` para as regras que decorrem do ADR-020.
+
+Pilha completa: `Outfit, system-ui, sans-serif` para texto; `JetBrains Mono, ui-monospace, monospace` para identificadores e timestamps.
 
 ## Grid e responsividade
 

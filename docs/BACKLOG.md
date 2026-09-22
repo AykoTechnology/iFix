@@ -45,4 +45,4 @@
 
 ## Decisões em aberto que bloqueiam fases
 
-Ver `docs/ESM_ITSM_PLATFORM_SPEC.md` § 12 (R1 a R11) — entre elas o licenciamento das fontes Gilroy/Lufga (bloqueia a Fase 0), a política de retenção LGPD e a escolha do provedor de LLM.
+Ver `docs/ESM_ITSM_PLATFORM_SPEC.md` § 12 (R2 a R11) — entre elas a política de retenção LGPD e o destino de observabilidade, que bloqueiam a Fase 0, e a escolha do provedor de LLM. Riscos já encerrados ficam registrados na § 12.1.

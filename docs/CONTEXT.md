@@ -106,9 +106,7 @@ Texto completo e o gate de CI correspondente a cada uma: § 10.1 da especificaç
 
 ## 9. Pendências abertas
 
-11 riscos e decisões em aberto (R1–R11) na § 12 da especificação. Os que bloqueiam a Fase 0:
-
-- **R1** — definição tipográfica (§ 12.1 da especificação). O protótipo não carrega Gilroy nem Lufga; o que renderiza é Outfit. Primeira ação, sem custo: confirmar com quem aprovou o design qual fonte estava efetivamente vendo. Se for licenciar, depende do **R9(a)**.
+10 riscos e decisões em aberto (R2–R11) na § 12 da especificação; os encerrados ficam registrados na § 12.1. Os que bloqueiam a Fase 0:
 - **R3** — política de retenção e base legal LGPD por categoria de dado (classificação precisa existir antes do primeiro schema com dado pessoal).
 - **R6** — destino de exportação da observabilidade (coletor OTLP).
 - **R11** — licença do repositório.

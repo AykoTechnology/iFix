@@ -36,14 +36,19 @@ O Axe-core e o validador de contraste não capturam as violações mais caras de
 - **Gradiente de marca:** um único destaque por tela. Proibido em fundo de fila, texto corrido, alerta de incidente massivo e botão destrutivo.
 - **Foco visível nunca suprimido** — `outline: none` sem substituto equivalente é reprovação automática.
 
-## Risco aberto: a fonte que renderiza hoje depende da máquina de quem olha
+## Tipografia (ADR-020)
 
-`tokens.json` declara **Gilroy** (display) e **Lufga** (corpo), ambas comerciais. Mas o protótipo recebido do Claude Design **não as carrega**: o único `<link>` de fonte traz `Outfit` e `JetBrains Mono` do Google Fonts, e não há nenhuma declaração `@font-face`.
+**Outfit** para display e corpo, **JetBrains Mono** para monoespaçado. Ambas sob SIL Open Font License 1.1, **servidas pela própria aplicação**.
 
-Ou seja, Gilroy e Lufga só aparecem para quem já as tem instaladas localmente. Para todos os demais — incluindo, muito provavelmente, quem revisou e aprovou o design no navegador — **o que renderiza é Outfit**.
+O design system original especificava Gilroy e Lufga, famílias comerciais. A análise do handoff mostrou que **nenhuma das duas era efetivamente carregada** — não havia `@font-face` algum, e o único `<link>` de fonte trazia justamente Outfit e JetBrains Mono. Elas só renderizavam em máquina que já as tivesse instaladas, o que significa que a revisão de design que as aprovou ocorreu, na prática, exibindo Outfit.
 
-Antes de qualquer decisão de compra, a ação mais barata é confirmar com quem aprovou qual tipografia estava efetivamente vendo. Se era Outfit, o risco se encerra sem custo e basta corrigir os tokens.
+### Regras que decorrem do ADR-020
 
-Se a decisão for licenciar, o escopo depende do **R9(a)** — SaaS hospedado por nós e software instalado no cliente exigem licenças de naturezas diferentes, porque a segunda implica **redistribuição** dos arquivos de fonte a terceiros dentro da imagem de contêiner.
+1. **Nenhuma fonte vem de CDN de terceiros em tempo de execução** — `fonts.googleapis.com` incluído. Isso quebraria implantação sem saída para a internet e transmitiria o IP de cada usuário a um terceiro a cada carregamento.
+2. O precedente **extrapola tipografia**: nenhum recurso estático de terceiros (ícones, bibliotecas) é consumido de CDN externo em runtime.
+3. `font.family.display` e `font.family.body` permanecem **tokens distintos**, ambos resolvendo para Outfit. Reintroduzir uma família de display é troca de valor, não refatoração de componente.
+4. A hierarquia vem de **tamanho e peso** (`font.size`, `font.weight`), não de contraste entre famílias. Se faltar contraste entre título e corpo, a correção é na escala — nunca em valor literal no componente.
 
-Análise completa, alternativas e critérios de avaliação tipográfica: **`docs/ESM_ITSM_PLATFORM_SPEC.md` § 12.1**. Bloqueia o fechamento da Fase 0 (Épico 11.6).
+### A verificar na implementação (Épico 11.6)
+
+Se a Outfit oferece numerais tabulares. A fila de chamados alinha tempos de SLA e contagens em coluna; sem `tnum`, aplicar `font-variant-numeric: tabular-nums` e validar no componente de tabela.

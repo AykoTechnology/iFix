@@ -11,7 +11,7 @@
   - `[+]` A validação de contraste roda sobre **ambos** os temas (claro e escuro) como teste automatizado na esteira (Épico 11.4), não como conferência visual.
   - `[+]` Componente que use valor estético literal (`#723CEB`, `24px`) em vez de token é reprovado pelo gate 10 da §6.4.
   - `[+]` Alteração de design entra primeiro em `/design-system/tokens.json`; propagar direto para o Tailwind ou para o componente é o caminho por onde o *drift* retorna.
-  - `[+]` **Risco material:** o design system especifica as famílias comerciais **Gilroy** e **Lufga**, e o protótipo recebido usa `Outfit` (Google Fonts) como substituta de renderização. A identidade tipográfica do produto depende de aquisição de licença de uso comercial e hospedagem própria (Épico 11.6) — questão jurídica e orçamentária, não técnica.
+  - `[+]` **Risco material (R1, § 12.1):** os tokens declaram as famílias comerciais **Gilroy** e **Lufga**, mas o protótipo recebido **não as carrega** — o único `<link>` de fonte traz `Outfit` e `JetBrains Mono`, e não há `@font-face` algum. As duas comerciais só renderizam em máquina que já as tenha instalada, o que torna provável que a identidade aprovada já seja a Outfit. Enquanto o R1 não se encerra, os tokens mantêm as comerciais como primeiro nome da pilha e a Outfit como *fallback* efetivo — situação que precisa ser resolvida, e não normalizada, porque a fonte que renderiza hoje depende da máquina de quem olha.
 
 ---
 

@@ -36,8 +36,14 @@ O Axe-core e o validador de contraste não capturam as violações mais caras de
 - **Gradiente de marca:** um único destaque por tela. Proibido em fundo de fila, texto corrido, alerta de incidente massivo e botão destrutivo.
 - **Foco visível nunca suprimido** — `outline: none` sem substituto equivalente é reprovação automática.
 
-## Risco aberto: fontes comerciais
+## Risco aberto: a fonte que renderiza hoje depende da máquina de quem olha
 
-`tokens.json` declara as famílias **Gilroy** (display) e **Lufga** (corpo), ambas comerciais. O protótipo recebido do Claude Design usa **Outfit** (Google Fonts) como substituta de renderização, e é ela que está no *fallback* dos tokens.
+`tokens.json` declara **Gilroy** (display) e **Lufga** (corpo), ambas comerciais. Mas o protótipo recebido do Claude Design **não as carrega**: o único `<link>` de fonte traz `Outfit` e `JetBrains Mono` do Google Fonts, e não há nenhuma declaração `@font-face`.
 
-Sem aquisição de licença de uso comercial e hospedagem própria (`@font-face` self-hosted), o produto vai ao ar com tipografia diferente da aprovada em design. Ver **R1** em `docs/ESM_ITSM_PLATFORM_SPEC.md` § 12 e Épico 11.6 — é decisão jurídica e orçamentária, não técnica, e bloqueia o fechamento da Fase 0.
+Ou seja, Gilroy e Lufga só aparecem para quem já as tem instaladas localmente. Para todos os demais — incluindo, muito provavelmente, quem revisou e aprovou o design no navegador — **o que renderiza é Outfit**.
+
+Antes de qualquer decisão de compra, a ação mais barata é confirmar com quem aprovou qual tipografia estava efetivamente vendo. Se era Outfit, o risco se encerra sem custo e basta corrigir os tokens.
+
+Se a decisão for licenciar, o escopo depende do **R9(a)** — SaaS hospedado por nós e software instalado no cliente exigem licenças de naturezas diferentes, porque a segunda implica **redistribuição** dos arquivos de fonte a terceiros dentro da imagem de contêiner.
+
+Análise completa, alternativas e critérios de avaliação tipográfica: **`docs/ESM_ITSM_PLATFORM_SPEC.md` § 12.1**. Bloqueia o fechamento da Fase 0 (Épico 11.6).

@@ -26,7 +26,9 @@ Este diretório contém a **documentação** de design. O artefato **compilável
 - **Lufga** — interface e corpo de texto (Regular/Medium).
 - **JetBrains Mono** — números de chamado (`INC-48192`), IDs de CI (`CI-SRV-0231`), timestamps ISO 8601 e qualquer representação de schema JSON visível ao usuário.
 
-Fallback de carregamento: `Outfit` (Google Fonts) + `system-ui, sans-serif`, já que Gilroy/Lufga são fontes licenciadas que precisam ser hospedadas como `@font-face` self-hosted em produção (ação pendente: obter os arquivos de fonte licenciados antes do lançamento — ver `docs/CONTEXT.md` § Pendências).
+> **Atenção (risco R1 em aberto):** o protótipo **não carrega** Gilroy nem Lufga. O único `<link>` de fonte traz `Outfit` e `JetBrains Mono` do Google Fonts, sem nenhum `@font-face`. As duas famílias comerciais só renderizam em máquina que já as tenha instalada — na prática, o que se vê é **Outfit**, provavelmente inclusive na revisão que aprovou o design. Não tratar a pilha tipográfica como definitiva até o R1 ser encerrado: análise completa, alternativas e critérios de avaliação em `docs/ESM_ITSM_PLATFORM_SPEC.md` § 12.1.
+
+Fallback de carregamento: `Outfit` (Google Fonts) + `system-ui, sans-serif`.
 
 ## Grid e responsividade
 

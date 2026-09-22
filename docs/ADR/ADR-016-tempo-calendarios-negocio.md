@@ -4,7 +4,7 @@
 # ADR-016: Tempo, Fuso Horário e Calendários de Negócio
 
 - **Status:** Proposto
-- **Contexto:** A pausa de SLA em "Aguardando solicitante" (Épico 6.1), o horário útil por espaço e região (Épico 16.2), a janela de silêncio de notificações (Épico 10.4), a janela de mudança (Épico 6.3) e o cálculo de *aging* (Épico 9.2) dependem todos de uma semântica de tempo que nunca foi definida. Em um produto com operação em múltiplas unidades e fusos, isso é fonte garantida de divergência entre o que o sistema calcula e o que o cliente cobra em reunião de nível de serviço.
+- **Contexto:** A pausa de SLA em "Aguardando solicitante" (Épico 6.1), o horário útil por espaço e região (Épico 16.2), a janela de silêncio de notificações (Épico 10.4), a janela de mudança (Épico 6.3) e o cálculo de _aging_ (Épico 9.2) dependem todos de uma semântica de tempo que nunca foi definida. Em um produto com operação em múltiplas unidades e fusos, isso é fonte garantida de divergência entre o que o sistema calcula e o que o cliente cobra em reunião de nível de serviço.
 - **Decisão:**
   - Persistência sempre em `timestamptz` UTC. Conversão para fuso local **apenas** na apresentação.
   - Calendário de negócio é entidade de primeira classe: jornada por dia da semana, feriados nacionais/regionais e exceções, associado a espaço de serviço e/ou localidade.

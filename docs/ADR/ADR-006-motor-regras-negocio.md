@@ -11,7 +11,7 @@
   - `[+]` O avaliador é função pura, sem I/O — recebe fatos, devolve decisão. Isso o torna exaustivamente testável e é a razão pela qual sua cobertura de testes exigida é superior ao piso de 85% da DoD.
   - `[+]` Toda avaliação é registrada com os fatos de entrada e o resultado (Épico 7.6): auditoria de **decisão**, não apenas de mutação. Sem isso, é impossível responder "por que este chamado foi roteado para este time em março".
   - `[+]` Precedência, escopo e critério de parada precisam ser explícitos e visíveis ao autor da regra (Épico 7.5) — um motor de regras cuja ordem de avaliação é implícita produz comportamento imprevisível em produção.
-  - `[+]` Guia de decisão para o time: se a lógica responde *"sob qual condição"* e é reutilizável, é regra (BRE). Se responde *"o que acontece em seguida"* e é específica de um fluxo, é transição (workflow).
+  - `[+]` Guia de decisão para o time: se a lógica responde _"sob qual condição"_ e é reutilizável, é regra (BRE). Se responde _"o que acontece em seguida"_ e é específica de um fluxo, é transição (workflow).
 
 ---
 

@@ -16,7 +16,7 @@
   - A cobertura de 85% é **piso**, não meta: o BRE e o motor de workflow exigem cobertura substancialmente superior por serem infraestrutura de decisão.
 - **Consequências:**
   - O teste que mais importa neste produto — o de isolamento — passa a ser estrutural e automático, não dependente de disciplina do revisor.
-  - A suíte de integração é mais lenta que uma suíte com *mocks*; é um custo aceito conscientemente em troca de exercitar RLS e `pgmq` de verdade.
+  - A suíte de integração é mais lenta que uma suíte com _mocks_; é um custo aceito conscientemente em troca de exercitar RLS e `pgmq` de verdade.
   - Exige infraestrutura de CI capaz de subir contêineres (Docker-in-Docker ou serviço equivalente).
 
 ---

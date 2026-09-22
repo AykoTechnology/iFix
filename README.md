@@ -4,14 +4,14 @@ Plataforma de Gestão de Serviços Empresariais (ESM) e de TI (ITSM), construíd
 
 ## Comece por aqui
 
-| Se você quer... | Leia |
-|---|---|
-| **A especificação completa** — arquitetura, backlog, ADRs, requisitos não-funcionais, riscos | **[`docs/ESM_ITSM_PLATFORM_SPEC.md`](docs/ESM_ITSM_PLATFORM_SPEC.md)** |
-| Saber o que já existe e o que fazer a seguir | [`docs/CONTEXT.md`](docs/CONTEXT.md) |
-| O índice de épicos e Issues | [`docs/BACKLOG.md`](docs/BACKLOG.md) |
-| Entender uma decisão arquitetural | [`docs/ADR/`](docs/ADR/) *(gerado da § 9 da especificação)* |
-| Implementar UI fiel ao design | [`/design-system/`](design-system/) (tokens) + [`docs/design-system/`](docs/design-system/) (componentes e telas) |
-| Contribuir com código | [`CONTRIBUTING.md`](CONTRIBUTING.md) |
+| Se você quer...                                                                              | Leia                                                                                                              |
+| -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| **A especificação completa** — arquitetura, backlog, ADRs, requisitos não-funcionais, riscos | **[`docs/ESM_ITSM_PLATFORM_SPEC.md`](docs/ESM_ITSM_PLATFORM_SPEC.md)**                                            |
+| Saber o que já existe e o que fazer a seguir                                                 | [`docs/CONTEXT.md`](docs/CONTEXT.md)                                                                              |
+| O índice de épicos e Issues                                                                  | [`docs/BACKLOG.md`](docs/BACKLOG.md)                                                                              |
+| Entender uma decisão arquitetural                                                            | [`docs/ADR/`](docs/ADR/) _(gerado da § 9 da especificação)_                                                       |
+| Implementar UI fiel ao design                                                                | [`/design-system/`](design-system/) (tokens) + [`docs/design-system/`](docs/design-system/) (componentes e telas) |
+| Contribuir com código                                                                        | [`CONTRIBUTING.md`](CONTRIBUTING.md)                                                                              |
 
 ## Estrutura do monorepo
 
@@ -35,7 +35,7 @@ supabase/         Migrações SQL versionadas + políticas RLS, seeds de desenvo
 3. **Zero scripts imperativos em regra de negócio** — DSL declarativa (ADR-004) ou motor de regras (ADR-006), nunca `eval()`.
 4. **WCAG 2.2 AA é critério de bloqueio**, com mecanismo de CI que o sustenta (ADR-005).
 5. **Imagens Distroless**, `nonroot`, sistema de arquivos somente leitura (ADR-001).
-6. **Consumidores de fila idempotentes** — `pgmq` é *at-least-once* (ADR-002).
+6. **Consumidores de fila idempotentes** — `pgmq` é _at-least-once_ (ADR-002).
 7. **Fonte única para cada contrato**: API vem do Zod (ADR-009), UI vem do `tokens.json` (ADR-011).
 
 As 11 Regras de Ouro, cada uma com o gate de CI que a torna mecânica, estão na § 10.1 da especificação.

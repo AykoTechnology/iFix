@@ -1,0 +1,11 @@
+dist/
+coverage/
+node_modules/
+package-lock.json
+
+# Artefatos gerados: o formato pertence ao gerador, não ao formatador.
+# Deixar o Prettier reescrevê-los faria o gate de sincronia (gate 12) brigar com o
+# gate de formatação (gate 1), e o perdedor seria quem abrisse o PR.
+docs/ADR/
+docs/api/openapi.json
+design-system/build/

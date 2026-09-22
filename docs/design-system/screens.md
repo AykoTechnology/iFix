@@ -2,15 +2,15 @@
 
 As 7 telas do handoff (`iFix Telas.dc.html`, 1440×900) já validam a arquitetura de informação dos 5 épicos originais da spec técnica. Este documento mapeia cada tela para o módulo de produto, o épico correspondente e as decisões de UX que **restringem** a implementação (não são sugestões — são contratos de interface).
 
-| # | Tela | Módulo de produto | Épico(s) relacionado(s) |
-|---|---|---|---|
-| 01 | Central do analista | Dashboard operacional | Épico 9 (Analytics) + base de todos |
-| 02 | Mesa de atendimento | Workspace de chamado + KB contextual | Épico 3 (Base de Conhecimento) |
-| 03 | Catálogo de serviços | Catálogo em cards dinâmicos | Épico 4 (Catálogo) |
-| 04 | Fluxos | FlowBuilder zero-code | Épico 1 parcial + Épico 7 (Motor de Regras/Workflow) |
-| 05 | CMDB | CMDB federada + raio de impacto | Épico 8 (CMDB & AIOps) |
-| 06 | AIOps | Correlação/storm alert + relatório CAB | Épico 5 (AIOps) |
-| 07 | Alçadas | Delegação + comparação de ambientes | Épico 2 (Delegação) + Épico 1 (Config Portability) |
+| #   | Tela                 | Módulo de produto                      | Épico(s) relacionado(s)                              |
+| --- | -------------------- | -------------------------------------- | ---------------------------------------------------- |
+| 01  | Central do analista  | Dashboard operacional                  | Épico 9 (Analytics) + base de todos                  |
+| 02  | Mesa de atendimento  | Workspace de chamado + KB contextual   | Épico 3 (Base de Conhecimento)                       |
+| 03  | Catálogo de serviços | Catálogo em cards dinâmicos            | Épico 4 (Catálogo)                                   |
+| 04  | Fluxos               | FlowBuilder zero-code                  | Épico 1 parcial + Épico 7 (Motor de Regras/Workflow) |
+| 05  | CMDB                 | CMDB federada + raio de impacto        | Épico 8 (CMDB & AIOps)                               |
+| 06  | AIOps                | Correlação/storm alert + relatório CAB | Épico 5 (AIOps)                                      |
+| 07  | Alçadas              | Delegação + comparação de ambientes    | Épico 2 (Delegação) + Épico 1 (Config Portability)   |
 
 ## 01 · Central do analista
 
@@ -69,7 +69,7 @@ O handoff cobre o núcleo mas não inclui (sinalizar para o próximo ciclo de de
 
 - Tela de login/SSO e onboarding de tenant.
 - Portal de autoatendimento do solicitante final (fora da mesa do analista) — o catálogo (03) é o mais próximo, mas falta a tela de "Meus pedidos"/acompanhamento citada no header.
-- Editor de schema JSON de formulário dinâmico (Épico 4, História 4.3) — o wizard (seção 07 do design system) mostra o *resultado* renderizado, não a tela de autoria do schema.
+- Editor de schema JSON de formulário dinâmico (Épico 4, História 4.3) — o wizard (seção 07 do design system) mostra o _resultado_ renderizado, não a tela de autoria do schema.
 - Tela de Analytics/Relatórios dedicada (além dos cards do dashboard) — necessária para o Épico 9 proposto abaixo.
 - Central de notificações in-app.
 - Editor de árvore de decisão/expressão do motor de regras (Épico 7) além do FlowBuilder de aprovações.

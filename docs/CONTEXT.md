@@ -2,60 +2,98 @@
 
 > Documento mestre de **estado**. Se você é um agente de IA (Claude Code, Codex) ou um novo desenvolvedor, leia este arquivo inteiro antes de abrir um PR.
 >
-> Divisão de papéis: `docs/ESM_ITSM_PLATFORM_SPEC.md` responde *"o que decidimos construir e por quê"* (intenção). Este arquivo responde *"o que já existe e como está"* (realidade). Divergência entre os dois é esperada enquanto uma fase está em curso — divergência **não registrada** é o problema.
+> Divisão de papéis: `docs/ESM_ITSM_PLATFORM_SPEC.md` responde _"o que decidimos construir e por quê"_ (intenção). Este arquivo responde _"o que já existe e como está"_ (realidade). Divergência entre os dois é esperada enquanto uma fase está em curso — divergência **não registrada** é o problema.
 
 ## 0. O que é o iFix
 
 Plataforma cloud-native de **ESM/ITSM** (Enterprise & IT Service Management), multi-domínio (TI, RH, Finanças, Instalações Físicas), construída do zero sobre Node.js 22 + TypeScript + Fastify + Supabase Self-Hosted, rodando em Kubernetes com imagens Distroless.
 
-- Especificação vigente: **`docs/ESM_ITSM_PLATFORM_SPEC.md`** (v2.0)
+- Especificação vigente: **`docs/ESM_ITSM_PLATFORM_SPEC.md`** (v2.1)
 - Backlog: 21 épicos em 8 fases — ver § 4 da especificação e `docs/BACKLOG.md` (índice de Issues)
-- Decisões: 19 ADRs — ver § 9 da especificação (`docs/ADR/` é gerado a partir dela)
+- Decisões: 20 ADRs — ver § 9 da especificação (`docs/ADR/` é gerado a partir dela)
 
 ## 1. Status atual
 
-**Fase:** 0 — Fundação (planejamento e scaffolding). **Nenhum código de aplicação foi escrito.** O que existe é a camada de documentação viva, os ADRs, o backlog, os tokens de design e o scaffold de pastas do monorepo.
+**Fase:** 0 — Fundação, em curso.
 
 ### Módulos concluídos
-Nenhum.
+
+| Módulo                          | Entregue                                                                                                                                              |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Padrão de referência de RLS** | `supabase/migrations/20260922000001_foundation.sql` — tenancy em dois eixos, auditoria imutável, UUID v7. É o formato que toda migração futura copia. |
+| **Trilha de auditoria**         | `audit.logs` particionada, captura por gatilho, imutável por privilégio **e** por gatilho (resiste a superusuário)                                    |
+| **Suíte de vazamento**          | 23 testes contra PostgreSQL real, verificados por mutação — cada teste foi visto falhando quando a proteção que afirma verificar é removida           |
+| **Tooling do monorepo**         | npm workspaces, TypeScript estrito, ESLint (com as regras que sustentam as Regras de Ouro 7 e 11), Prettier, Vitest                                   |
+| **Contrato de claims**          | `src/shared` — `jwtClaimsSchema` é o contrato entre autenticação e políticas RLS, validado antes de virar GUC                                         |
 
 ### Próximos passos imediatos (Fase 0)
 
-1. Inicializar `src/api` (Fastify + TypeScript estrito + Zod) com health-check e as três probes reais (`startupProbe`, `livenessProbe`, `readinessProbe`).
-2. Inicializar `supabase/migrations` com o schema base — `tenants`, `workspaces`, `people` — e o **padrão de RLS de referência** (ADR-003 + ADR-012) que toda tabela futura deve seguir. Este é o artefato mais importante da fase: ele define o formato que todas as migrações subsequentes copiam.
-3. Configurar o pipeline do Style Dictionary gerando `src/web/tailwind.config.ts` a partir de `/design-system/tokens.json` (ADR-011).
-4. Subir Storybook em `src/web` com `@storybook/addon-a11y` **antes do primeiro componente** — o ADR-005 só é bloqueante se existir o mecanismo que o bloqueia.
-5. `Dockerfile` multi-estágio (ADR-001) e esteira de CI com os 12 gates da § 6.4 da especificação.
-6. Instrumentação OpenTelemetry desde o primeiro endpoint (ADR-008) — retroinstrumentar depois custa mais e costuma não acontecer.
+1. **`src/api`** — Fastify + Zod, health-check e as três probes reais (`startupProbe`, `livenessProbe`, `readinessProbe`), aplicando o contexto de requisição por transação (`applyContext` equivalente ao de `tests/helpers/db.ts`).
+2. **OpenTelemetry** desde o primeiro endpoint (ADR-008), com o `traceparent` alimentando a GUC `app.trace_id` que a auditoria já lê.
+3. **Geração do OpenAPI** a partir dos schemas Zod e o gate 6 (drift de contrato).
+4. **Pipeline do Style Dictionary** gerando `src/web/tailwind.config.ts` a partir de `/design-system/tokens.json` (ADR-011).
+5. **Storybook** com `@storybook/addon-a11y` **antes do primeiro componente** — o ADR-005 só é bloqueante se existir o mecanismo que o bloqueia.
+6. **`Dockerfile`** multi-estágio (ADR-001) e a esteira de CI com os 12 gates da § 6.4.
 
 **Marco de saída da Fase 0:** um endpoint em produção com RLS ativa, auditoria disparando, trace atravessando a fila e token de UI aplicado — ponta a ponta.
 
+### Como rodar localmente
+
+```bash
+npm install
+./scripts/local-db/reset.sh   # recria ifix_test e aplica as migrações
+npm run verify                # lint + typecheck + sincronia de ADRs + testes
+```
+
+Onde houver Docker, o alvo é Testcontainers (ADR-018). O `reset.sh` entrega a mesma garantia de banco efêmero onde não houver daemon disponível.
+
 ## 2. Fronteiras arquiteturais
 
-| Camada | Responsabilidade | Nunca faz |
-|---|---|---|
-| `src/api` | HTTP, validação de entrada (Zod), orquestração de casos de uso, publicação em filas `pgmq` | Lógica condicional de negócio embutida (pertence ao BRE, ADR-006) |
-| `src/workers` | Consumo idempotente de filas, jobs assíncronos, correlação AIOps, notificações | Servir HTTP síncrono ao usuário final |
-| `src/web` | React 19 + Tailwind, consumindo a API pelo cliente gerado do OpenAPI (ADR-009) | Acessar Postgres/Supabase diretamente |
-| `src/shared` | Tipos, schemas Zod, motor de workflow (ADR-004), motor de regras (ADR-006) | Depender de framework HTTP ou de UI |
-| `supabase/migrations` | Schema SQL versionado + políticas RLS | Lógica de negócio em procedures (exceto triggers de auditoria, ADR-007) |
-| `/design-system` | Tokens DTCG compiláveis (ADR-011) | Conter componente, documentação longa ou saída de build editada à mão |
+| Camada                | Responsabilidade                                                                           | Nunca faz                                                               |
+| --------------------- | ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------- |
+| `src/api`             | HTTP, validação de entrada (Zod), orquestração de casos de uso, publicação em filas `pgmq` | Lógica condicional de negócio embutida (pertence ao BRE, ADR-006)       |
+| `src/workers`         | Consumo idempotente de filas, jobs assíncronos, correlação AIOps, notificações             | Servir HTTP síncrono ao usuário final                                   |
+| `src/web`             | React 19 + Tailwind, consumindo a API pelo cliente gerado do OpenAPI (ADR-009)             | Acessar Postgres/Supabase diretamente                                   |
+| `src/shared`          | Tipos, schemas Zod, motor de workflow (ADR-004), motor de regras (ADR-006)                 | Depender de framework HTTP ou de UI                                     |
+| `supabase/migrations` | Schema SQL versionado + políticas RLS                                                      | Lógica de negócio em procedures (exceto triggers de auditoria, ADR-007) |
+| `/design-system`      | Tokens DTCG compiláveis (ADR-011)                                                          | Conter componente, documentação longa ou saída de build editada à mão   |
 
 ## 3. Mapa de filas (`pgmq`) — vivo
 
 **Nenhuma fila foi criada ainda.** As filas previstas estão na § 5.3 da especificação. Esta seção passa a listar o estado **real** a partir do primeiro worker implementado, com: nome, produtor, consumidor, chave de idempotência e estado da DLQ.
 
-| Fila | Produtor | Consumidor | Idempotência | Status |
-|---|---|---|---|---|
-| — | — | — | — | nenhuma implementada |
+| Fila | Produtor | Consumidor | Idempotência | Status               |
+| ---- | -------- | ---------- | ------------ | -------------------- |
+| —    | —        | —          | —            | nenhuma implementada |
 
 ## 4. Mapa de tabelas core — vivo
 
-**Nenhuma migração foi criada ainda.** O modelo de intenção está na § 5.2 da especificação. Esta seção passa a listar as tabelas **realmente criadas**, com a confirmação de RLS ativa e de gatilho de auditoria por tabela — é a evidência que a revisão de PR consulta.
+Tabelas **realmente criadas**, com confirmação de RLS e de gatilho de auditoria — é a evidência que a revisão de PR consulta. O modelo de intenção completo está na § 5.2 da especificação.
 
-| Tabela | Migração | RLS | Auditoria | Observação |
-|---|---|---|---|---|
-| — | — | — | — | nenhuma implementada |
+| Tabela                     | Migração   | Eixo de isolamento   | RLS forçada | Auditoria |
+| -------------------------- | ---------- | -------------------- | ----------- | --------- |
+| `public.tenants`           | 2026092200 | raiz do locatário    | sim         | sim       |
+| `public.workspaces`        | 2026092200 | locatário + espaço   | sim         | sim       |
+| `public.people`            | 2026092200 | locatário            | sim         | sim       |
+| `public.workspace_members` | 2026092200 | locatário + espaço   | sim         | sim       |
+| `audit.logs`               | 2026092200 | particionada por mês | append-only | n/a       |
+
+As três garantias abaixo não dependem de disciplina de revisão: há teste estrutural em `tests/rls.test.ts` que falha se alguma tabela de `public` violar qualquer uma delas.
+
+1. `ENABLE` **e** `FORCE ROW LEVEL SECURITY` — sem `FORCE`, o dono da tabela ignora a política e o isolamento não existe para quem roda migração.
+2. Gatilho `audit.capture` anexado.
+3. Toda política de `INSERT`/`UPDATE`/`ALL` declara `WITH CHECK` explícito — o PostgreSQL reaproveita o `USING` quando ele é omitido, o que acoplaria leitura e escrita.
+
+### Funções do padrão (schema `app`)
+
+| Função                                     | Papel                                                             |
+| ------------------------------------------ | ----------------------------------------------------------------- |
+| `app.tenant_visible(uuid)`                 | Eixo 1. Usar em `USING` e `WITH CHECK` de toda tabela de negócio. |
+| `app.workspace_visible(uuid, uuid)`        | Eixo 2. Combina locatário com participação no espaço de serviço.  |
+| `app.current_tenant_id()` / `_person_id()` | Leem as claims da GUC `request.jwt.claims`.                       |
+| `app.is_service_role()`                    | Exceção auditada que atravessa locatários (ADR-003).              |
+| `app.uuid_generate_v7()`                   | Chave primária ordenável por tempo (ADR-015).                     |
+| `audit.attach(regclass)`                   | Anexa a auditoria. Chamar em **toda** tabela de negócio nova.     |
 
 ## 5. Convenções ativas
 
@@ -107,17 +145,18 @@ Texto completo e o gate de CI correspondente a cada uma: § 10.1 da especificaç
 ## 9. Pendências abertas
 
 10 riscos e decisões em aberto (R2–R11) na § 12 da especificação; os encerrados ficam registrados na § 12.1. Os que bloqueiam a Fase 0:
+
 - **R3** — política de retenção e base legal LGPD por categoria de dado (classificação precisa existir antes do primeiro schema com dado pessoal).
 - **R6** — destino de exportação da observabilidade (coletor OTLP).
 - **R11** — licença do repositório.
 
 ## 10. Referências
 
-| Documento | Papel |
-|---|---|
-| `docs/ESM_ITSM_PLATFORM_SPEC.md` | Especificação vigente (v2.0): arquitetura, backlog, ADRs, NFRs, riscos |
-| `docs/BACKLOG.md` | Índice de fases e Issues |
-| `docs/ADR/` | Registros individuais (**gerados** pelo `scripts/sync-adrs.mjs`) |
-| `/design-system/tokens.json` | Tokens DTCG compiláveis |
-| `docs/design-system/` | Documentação de design: componentes e telas de referência |
-| `docs/PLAYBOOKS/INCIDENTS_LEARNING.md` | Causa-raiz de falhas e regras derivadas |
+| Documento                              | Papel                                                                  |
+| -------------------------------------- | ---------------------------------------------------------------------- |
+| `docs/ESM_ITSM_PLATFORM_SPEC.md`       | Especificação vigente (v2.0): arquitetura, backlog, ADRs, NFRs, riscos |
+| `docs/BACKLOG.md`                      | Índice de fases e Issues                                               |
+| `docs/ADR/`                            | Registros individuais (**gerados** pelo `scripts/sync-adrs.mjs`)       |
+| `/design-system/tokens.json`           | Tokens DTCG compiláveis                                                |
+| `docs/design-system/`                  | Documentação de design: componentes e telas de referência              |
+| `docs/PLAYBOOKS/INCIDENTS_LEARNING.md` | Causa-raiz de falhas e regras derivadas                                |

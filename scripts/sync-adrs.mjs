@@ -53,11 +53,13 @@ if (start === -1 || end === -1) {
 const section = spec.slice(start, end);
 
 // Cada ADR começa em "### [`[+]` ]ADR-0NN: Título".
-const entries = [...section.matchAll(/^### (?:`\[\+\]` )?ADR-(\d{3}): (.+)$/gm)].map((m, i, all) => {
-  const bodyStart = m.index + m[0].length;
-  const bodyEnd = i + 1 < all.length ? all[i + 1].index : section.length;
-  return { num: m[1], title: m[2].trim(), body: section.slice(bodyStart, bodyEnd).trim() };
-});
+const entries = [...section.matchAll(/^### (?:`\[\+\]` )?ADR-(\d{3}): (.+)$/gm)].map(
+  (m, i, all) => {
+    const bodyStart = m.index + m[0].length;
+    const bodyEnd = i + 1 < all.length ? all[i + 1].index : section.length;
+    return { num: m[1], title: m[2].trim(), body: section.slice(bodyStart, bodyEnd).trim() };
+  },
+);
 
 if (entries.length === 0) {
   console.error("Nenhum ADR encontrado na seção 9.");
@@ -70,11 +72,15 @@ const render = ({ num, title, body }) =>
   `# ADR-${num}: ${title}\n\n${body}\n\n---\n\n` +
   `Contexto completo, backlog relacionado e demais decisões: \`docs/ESM_ITSM_PLATFORM_SPEC.md\`.\n`;
 
-const expected = new Map(entries.map((e) => [`ADR-${e.num}-${SLUGS[e.num] ?? "sem-slug"}.md`, render(e)]));
+const expected = new Map(
+  entries.map((e) => [`ADR-${e.num}-${SLUGS[e.num] ?? "sem-slug"}.md`, render(e)]),
+);
 
 const missingSlug = entries.filter((e) => !SLUGS[e.num]);
 if (missingSlug.length) {
-  console.error(`ADR sem slug definido em scripts/sync-adrs.mjs: ${missingSlug.map((e) => e.num).join(", ")}`);
+  console.error(
+    `ADR sem slug definido em scripts/sync-adrs.mjs: ${missingSlug.map((e) => e.num).join(", ")}`,
+  );
   process.exit(1);
 }
 
@@ -102,4 +108,8 @@ if (check && problems.length) {
   process.exit(1);
 }
 
-console.log(check ? `OK: ${expected.size} ADRs sincronizados.` : `Gerados ${expected.size} ADRs em docs/ADR/.`);
+console.log(
+  check
+    ? `OK: ${expected.size} ADRs sincronizados.`
+    : `Gerados ${expected.size} ADRs em docs/ADR/.`,
+);

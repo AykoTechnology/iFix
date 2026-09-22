@@ -9,10 +9,10 @@
   - Bucket privado por padrão, com políticas RLS espelhando o modelo do ADR-012 (locatário e espaço de serviço) — nunca bucket público com URL "secreta".
   - Acesso exclusivamente por **URL assinada de vida curta**, gerada por requisição autorizada.
   - **Varredura antivírus assíncrona obrigatória** antes de o arquivo ficar disponível para download; enquanto pendente, o anexo aparece como "em verificação".
-  - Tipo e tamanho de arquivo em lista de permissão explícita; conteúdo validado por assinatura de arquivo (*magic bytes*), não por extensão.
+  - Tipo e tamanho de arquivo em lista de permissão explícita; conteúdo validado por assinatura de arquivo (_magic bytes_), não por extensão.
   - Download servido com `Content-Disposition: attachment` e cabeçalhos que impeçam renderização no contexto da aplicação (proteção contra HTML/SVG maliciosos).
 - **Consequências:**
-  - O anexo deixa de ser vetor trivial de *XSS* ou de distribuição de malware entre colaboradores.
+  - O anexo deixa de ser vetor trivial de _XSS_ ou de distribuição de malware entre colaboradores.
   - Exige fila e worker de varredura (candidato natural: `pgmq_attachment_scan`), com estado do anexo visível na interface.
   - Retenção e eliminação de anexos seguem o ADR-013 — inclusive anexos são dado pessoal com frequência (foto, documento, comprovante).
   - Custos de armazenamento e política de expurgo passam a ser dimensionáveis desde a Fase 0, não descobertos em produção.

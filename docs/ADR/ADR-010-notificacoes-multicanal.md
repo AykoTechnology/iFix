@@ -10,7 +10,7 @@
   - `[+]` Nenhum módulo de negócio invoca provedor de e-mail diretamente: todos publicam na fila com um `event_type` padronizado. Isso preserva a consistência transacional do ADR-002 e mantém a idempotência centralizada em um único consumidor.
   - `[+]` Falha de canal externo (provedor de e-mail indisponível) nunca bloqueia a notificação in-app nem o evento de negócio original. A Central in-app é a fonte de verdade de "lido/não lido"; os demais canais são cópias de melhor esforço.
   - `[+]` A chave HMAC é por locatário e precisa de rotação suportada sem janela de indisponibilidade (período de aceitação de duas chaves) — ver Épico 12.6.
-  - `[+]` Sem controle de volume, o valor da notificação colapsa. Preferência por evento, *digest* e janela de silêncio (Épico 10.4) são parte do contrato de qualidade desta decisão, não melhoria futura.
+  - `[+]` Sem controle de volume, o valor da notificação colapsa. Preferência por evento, _digest_ e janela de silêncio (Épico 10.4) são parte do contrato de qualidade desta decisão, não melhoria futura.
   - `[+]` A dependência do Microsoft Graph pressupõe cliente com tenant Microsoft 365. O adaptador SMTP genérico deve permanecer suportado como alternativa de primeira classe, sob o mesmo contrato de adaptador.
 
 ---

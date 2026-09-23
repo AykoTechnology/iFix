@@ -56,3 +56,16 @@ Toda entrada nova é adicionada ao **topo** da lista (mais recente primeiro). Ne
   2. **A primeira execução de um gate novo é lida no log, não no ícone.** Confirmar que ele produziu saída de análise — contagem de commits varridos, imagem construída, alertas processados — antes de considerá-lo ativo.
   3. **Alerta de segredo em teste é silenciado pelo valor, nunca pelo diretório.** Uma alçada `tests/` inteira esconderia uma credencial real colada num teste, que é um dos caminhos reais de vazamento.
 - **Referência**: PR #22, `.github/workflows/ci.yml`, `.github/workflows/codeql.yml`, `.gitleaks.toml`, `scripts/local-db/bootstrap.sql`.
+
+### 2026-09-23 — Gate 9 reprovou com razão na primeira varredura: 6 CVEs na base Distroless
+
+- **Sintoma**: com a `trivy-action` corrigida, o job `container` construiu a imagem sem erro e o Trivy reprovou com 6 vulnerabilidades em `libssl3` — 1 crítica (`CVE-2026-31789`) e 5 altas — todas com correção disponível a montante.
+- **Causa-raiz**: `gcr.io/distroless/nodejs22-debian12` carrega `libssl3` 3.0.18-1~deb12u2; as correções estão em 3.0.19 e 3.0.20. A base ainda não foi reconstruída a montante com o pacote atualizado. **Distroless não tem gerenciador de pacotes nem shell**, então não existe `apt upgrade` dentro da imagem: a única correção possível é trocar a base.
+- **Por que não virou exceção**: a saída fácil seria `.trivyignore` com prazo. Antes disso, a pergunta certa era se existe base sem o defeito — e existe. A variante `nodejs22-debian13` usa o mesmo Node 22 LTS exigido pelo ADR-001 e varre **limpa**. Trocar corrige de verdade; ignorar apenas adia, mantendo o risco e gastando o gate.
+- **Como foi verificado sem Docker**: o Trivy escaneia imagem direto do registro, sem daemon. Isso permitiu comparar as duas variantes e confirmar `nonroot:x:65532` no `/etc/passwd` da nova base antes de trocar, em vez de descobrir no runner.
+- **Achado secundário**: a asserção de `nonroot` vinha **depois** do Trivy no job, então a reprovação por CVE abortou o passo e a invariante do ADR-001 nunca foi verificada. A ordem foi invertida: asserções sobre invariantes nossas rodam antes das verificações sobre higiene de terceiros, porque um problema alheio não pode esconder se o nosso próprio requisito foi cumprido.
+- **Regras novas**:
+  1. **Base de imagem vulnerável se troca, não se ignora**, enquanto existir variante equivalente sem o defeito. `.trivyignore` é último recurso, sempre com prazo.
+  2. **A tag da base permanece flutuante.** Fixar por digest congelaria a imagem na versão vulnerável; a reconstrução periódica a montante é o mecanismo que mantém as correções chegando.
+  3. **Num mesmo job, verificação de invariante nossa vem antes de varredura de terceiro.**
+- **Referência**: PR #23, `Dockerfile`, `.github/workflows/ci.yml`, ADR-001.

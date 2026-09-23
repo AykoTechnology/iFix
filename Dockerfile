@@ -43,7 +43,16 @@ RUN npm ci --omit=dev
 # ---------------------------------------------------------------------------
 # Estágio 3 — execução
 # ---------------------------------------------------------------------------
-FROM gcr.io/distroless/nodejs22-debian12 AS runtime
+# Base em Debian 13, não 12. A variante debian12 carrega `libssl3` 3.0.18, com 6
+# vulnerabilidades corrigidas a montante (1 crítica, 5 altas) que o gate 9 bloqueia —
+# e Distroless não tem gerenciador de pacotes, então não há como atualizar de dentro
+# da imagem: a única correção possível é trocar a base. A variante debian13 usa o
+# mesmo Node 22 LTS exigido pelo ADR-001 e varre limpa.
+#
+# A tag é flutuante de propósito: uma base fixada por digest congela a imagem na
+# versão vulnerável, e a reconstrução periódica a montante é justamente o mecanismo
+# que mantém as correções chegando.
+FROM gcr.io/distroless/nodejs22-debian13 AS runtime
 WORKDIR /app
 
 ENV NODE_ENV=production

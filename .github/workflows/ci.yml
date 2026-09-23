@@ -158,6 +158,16 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      # Antes do Trivy, de propósito. Esta asserção verifica uma invariante NOSSA
+      # (ADR-001 exige nonroot); o Trivy verifica a higiene da base, que é de terceiro.
+      # Com a ordem invertida, uma CVE na base aborta o job e esconde se o nosso
+      # próprio requisito foi cumprido — foi o que aconteceu na primeira execução real.
+      - name: Conferir que a imagem roda sem privilégio
+        run: |
+          usuario=$(docker inspect --format '{{.Config.User}}' ifix-api:${{ github.sha }})
+          echo "usuário da imagem: ${usuario}"
+          [ "${usuario}" = "nonroot:nonroot" ] || { echo "esperado nonroot:nonroot"; exit 1; }
+
       - name: Trivy — bloqueia CVSS ≥ 7.0
         uses: aquasecurity/trivy-action@v0.36.0
         with:
@@ -166,11 +176,3 @@ jobs:
           exit-code: "1"
           ignore-unfixed: true
           severity: HIGH,CRITICAL
-
-      - name: Conferir que a imagem roda sem privilégio
-        # O ADR-001 exige nonroot. Verificar aqui evita descobrir em produção que a
-        # imagem subiu como root por um COPY que trocou o dono.
-        run: |
-          usuario=$(docker inspect --format '{{.Config.User}}' ifix-api:${{ github.sha }})
-          echo "usuário da imagem: ${usuario}"
-          [ "${usuario}" = "nonroot:nonroot" ] || { echo "esperado nonroot:nonroot"; exit 1; }

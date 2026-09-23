@@ -44,7 +44,7 @@ Plataforma cloud-native de **ESM/ITSM** (Enterprise & IT Service Management), mu
 | 6 drift de OpenAPI              | ativo        |                                                                                 |
 | 7 acessibilidade                | **pendente** | aguarda o Storybook                                                             |
 | 8 SAST, dependências e segredos | ativo        | CodeQL, `npm audit`, Gitleaks                                                   |
-| 9 imagem e Trivy                | ativo        | **a primeira construção real da imagem acontecerá no CI** — ver ressalva abaixo |
+| 9 imagem e Trivy                | ativo        | imagem construída e varrida no CI; base em `nodejs22-debian13` — ver ressalva abaixo |
 | 10 auditoria de design tokens   | **pendente** | aguarda o pipeline do Style Dictionary                                          |
 | 11 validação de charts          | **pendente** | aguarda os charts terem conteúdo                                                |
 | 12 sincronia documental         | ativo        |                                                                                 |
@@ -53,7 +53,15 @@ Gates pendentes **não** têm etapa correspondente na esteira. Adicionar um pass
 
 ### Ressalva sobre o Dockerfile
 
-Este ambiente de desenvolvimento não tem daemon Docker, então a imagem **não foi construída aqui**. O que foi verificado é a parte que costuma quebrar: o layout de runtime foi simulado em diretório separado (`npm ci --omit=dev` + `dist` copiado) e o processo subiu, respondeu às três probes e encerrou com SIGTERM. Restam sem prova local a resolução das camadas do build e a varredura do Trivy — ambas cobertas pelo job `container` da esteira, que é onde a imagem será construída pela primeira vez.
+Este ambiente de desenvolvimento não tem daemon Docker, então a imagem **não é construída aqui**. O que se verifica localmente é o layout de runtime, simulado em diretório separado (`npm ci --omit=dev` + `dist` copiado): o processo sobe, responde às três probes e encerra com SIGTERM.
+
+A primeira construção real ocorreu no job `container` da esteira e **resolveu sem erro** — o Dockerfile está validado. A varredura do Trivy, porém, reprovou: a base `nodejs22-debian12` carrega `libssl3` 3.0.18, com 6 vulnerabilidades já corrigidas a montante (1 crítica, 5 altas). Distroless não tem gerenciador de pacotes, então não há correção de dentro da imagem; a base passou para `nodejs22-debian13`, que usa o mesmo Node 22 LTS e varre limpa.
+
+Onde não houver Docker, o Trivy escaneia a base direto do registro — útil para comparar variantes antes de trocar:
+
+```bash
+trivy image --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed gcr.io/distroless/nodejs22-debian13
+```
 
 ### Próximos passos imediatos (Fase 0)
 

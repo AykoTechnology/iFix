@@ -1,7 +1,7 @@
 import { Pool } from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { Client } from "pg";
-import { withRequestContext } from "../src/api/src/db/context.js";
+import { withRequestContext } from "../src/shared/src/db-context.js";
 import { FIXTURES, anaContext, bobContext, connectAsOwner, seed } from "./helpers/db.js";
 
 /**

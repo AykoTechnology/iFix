@@ -71,9 +71,15 @@ jobs:
 
     services:
       # ADR-018 exige banco real: as políticas RLS só existem no motor do banco, e um
-      # mock provaria apenas que concorda consigo mesmo.
+      # mock provaria apenas que concorda consigo mesmo. O mesmo vale para a fila —
+      # timeout de visibilidade e reentrega são semântica do pgmq, não do cliente.
+      #
+      # Imagem oficial do projeto pgmq, fixada na mesma versão que o
+      # `scripts/local-db/install-pgmq.sh` instala localmente. O contêiner de serviço
+      # não tem sistema de arquivos acessível ao job, então instalar a extensão nele
+      # depois não é possível: ela precisa já vir na imagem.
       postgres:
-        image: postgres:16
+        image: ghcr.io/pgmq/pg16-pgmq:v1.13.0
         env:
           POSTGRES_PASSWORD: local_dev_only
         ports: ["5432:5432"]

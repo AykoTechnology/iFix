@@ -29,6 +29,7 @@ Plataforma cloud-native de **ESM/ITSM** (Enterprise & IT Service Management), mu
 | **Contexto transacional**       | `withRequestContext` aplica claims com `SET LOCAL`, de modo que morram no commit e não vazem para a próxima requisição da mesma conexão de pool       |
 | **Contrato OpenAPI**            | `docs/api/openapi.json` derivado dos schemas Zod, com gate 6 verificando drift                                                                        |
 | **Design tokens**               | `design-system/build.mjs` compila `tokens.json` em `dist/tokens.css` e `dist/tailwind-theme.js` (Style Dictionary v4, ADR-011)                        |
+| **Fila assíncrona**             | `notifications` em pgmq, publicação transacional por `app.publish_event`, consumidor idempotente com DLQ (ADR-002)                                    |
 | **Empacotamento**               | `Dockerfile` multi-estágio para Distroless, `nonroot`, sem devDependencies nem fontes TS na imagem final                                              |
 | **Esteira de CI**               | `.github/workflows/` com os gates 1, 2, 3, 4, 5, 6, 8, 9 e 12 ativos                                                                                  |
 | **Graceful shutdown**           | Provado contra o artefato **compilado**: SIGTERM e SIGINT saem com código 0, drenam e registram no log (Regra de Ouro 8)                              |
@@ -90,11 +91,9 @@ trivy image --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed gcr.io/dis
 
 ### Próximos passos imediatos (Fase 0)
 
-1. **Pipeline do Style Dictionary** gerando `src/web/tailwind.config.ts` a partir de `/design-system/tokens.json` (ADR-011) — destrava o gate 10.
-2. **Storybook** com `@storybook/addon-a11y` **antes do primeiro componente** — destrava o gate 7 e é o que torna o ADR-005 efetivo.
-3. **Fila `pgmq`** com um consumidor idempotente, para fechar o marco de saída, que exige trace atravessando a fila.
-4. **Helm charts** com `securityContext`, as três probes e `terminationGracePeriodSeconds: 30` — destrava o gate 11.
-5. **OpenTelemetry completo** (ADR-008): o `trace-id` já vira `reqId` do Fastify e chega à auditoria pela GUC `app.trace_id`; falta o SDK com exportador OTLP — **bloqueado pelo R6**, que define o destino.
+1. **Storybook** com `@storybook/addon-a11y` **antes do primeiro componente** — destrava o gate 7 e é o que torna o ADR-005 efetivo.
+2. **Helm charts** com `securityContext`, as três probes e `terminationGracePeriodSeconds: 30` — destrava o gate 11.
+3. **OpenTelemetry completo** (ADR-008): o `trace-id` já vira `reqId` do Fastify e chega à auditoria pela GUC `app.trace_id`; falta o SDK com exportador OTLP — **bloqueado pelo R6**, que define o destino.
 
 **Marco de saída da Fase 0:** um endpoint em produção com RLS ativa, auditoria disparando, trace atravessando a fila e token de UI aplicado — ponta a ponta.
 
@@ -121,11 +120,16 @@ Onde houver Docker, o alvo é Testcontainers (ADR-018). O `reset.sh` entrega a m
 
 ## 3. Mapa de filas (`pgmq`) — vivo
 
-**Nenhuma fila foi criada ainda.** As filas previstas estão na § 5.3 da especificação. Esta seção passa a listar o estado **real** a partir do primeiro worker implementado, com: nome, produtor, consumidor, chave de idempotência e estado da DLQ.
+Estado **real**, não previsto. As filas planejadas estão na § 5.3 da especificação.
 
-| Fila | Produtor | Consumidor | Idempotência | Status               |
-| ---- | -------- | ---------- | ------------ | -------------------- |
-| —    | —        | —          | —            | nenhuma implementada |
+| Fila                | Produtor                          | Consumidor                 | Idempotência                        | DLQ                 |
+| ------------------- | --------------------------------- | -------------------------- | ----------------------------------- | ------------------- |
+| `notifications`     | `app.publish_event`               | `@ifix/workers` (consumer) | `(tenant_id, queue_name, event_id)` | `notifications_dlq` |
+| `notifications_dlq` | consumidor, ao esgotar tentativas | — (investigação manual)    | —                                   | —                   |
+
+**Nome:** a § 5.3 lista a fila como `pgmq_notifications`. O próprio pgmq prefixa a tabela com `q_`, então o prefixo `pgmq_` produziria `pgmq.q_pgmq_notifications`. A fila se chama `notifications`; o prefixo na especificação indica a tecnologia, não o nome.
+
+**Versão do pgmq:** `v1.13.0`, a mesma em `scripts/local-db/install-pgmq.sh` e na imagem `ghcr.io/pgmq/pg16-pgmq:v1.13.0` usada pela esteira. O pgmq é extensão de SQL puro — sem código C ou Rust —, então `make install` roda sem compilador.
 
 ## 4. Mapa de tabelas core — vivo
 

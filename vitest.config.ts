@@ -20,6 +20,9 @@ export default defineConfig({
         // conta faria a métrica reportar 0% para código que está, de fato, coberto.
         "src/api/src/index.ts",
         "src/api/src/openapi-emit.ts",
+        // Mesmo caso: laço de processo com espera por sinal. O consumo em si —
+        // `consumeBatch` — é exercitado contra pgmq real em `tests/queue.test.ts`.
+        "src/workers/src/index.ts",
       ],
       thresholds: { lines: 85, functions: 85, branches: 85, statements: 85 },
     },

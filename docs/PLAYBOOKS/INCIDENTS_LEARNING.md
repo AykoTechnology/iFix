@@ -83,3 +83,16 @@ Toda entrada nova é adicionada ao **topo** da lista (mais recente primeiro). Ne
   2. **Eixo de variação se detecta por estrutura, não por nome.** Nome colide — e a colisão é silenciosa.
   3. **Todo grupo bifurcado por tema declara todos os temas**, verificado por varredura da árvore, não só em `color.theme`.
 - **Referência**: `design-system/tokens.json` v1.2.0, `design-system/build.mjs`, `tests/design-tokens.test.ts`, ADR-005, ADR-011.
+
+### 2026-09-23 — Dois gates que teriam passado medindo a coisa errada
+
+- **Sintoma**: nenhum. Os dois defeitos foram encontrados ao verificar por mutação gates recém-ativados — nenhum deles produzia erro, aviso ou teste vermelho.
+- **Primeiro: o verificador de literais varria a saída de build.** Com o primeiro componente real em `src/web/`, o gate 10 passou a varrer 6 arquivos — mas quatro eram `src/web/dist/`, artefato do `tsc`. A mesma violação seria reportada duas vezes, e metade dos apontamentos indicaria uma linha que ninguém edita. O padrão de exclusão cobria só `design-system/dist/`; passou a cobrir qualquer `dist/`, em qualquer pacote.
+- **Segundo: o Axe em jsdom não mede contraste.** O jsdom não faz layout nem resolve `var()`, então `color-contrast` — a regra que qualquer pessoa assume que um gate de acessibilidade cobre — simplesmente não roda. Ela não falha: ela não avalia nada e o resultado sai limpo. Um gate 7 verde passaria a mensagem de que o contraste foi verificado quando não foi.
+- **Por que isso importa mais que os dois casos**: é a terceira vez neste repositório que um gate mede menos do que aparenta — antes foi o contrato OpenAPI vazio, depois as actions que não chegavam a executar. A pergunta que pega os três é a mesma: **em que estado este gate aprovaria sem ter verificado nada?**
+- **Mitigação aplicada**: as regras inertes em jsdom são **desabilitadas explicitamente e nomeadas no código**, para que ninguém as confunda com cobertura. O contraste é verificado onde pode ser: por cálculo direto sobre os tokens, nos dois temas, cobrindo todas as combinações declaradas — e não apenas as que alguma história renderizou. A limitação está escrita no `CONTEXT.md`, não só no comentário.
+- **Regras novas**:
+  1. **Regra de verificador que não pode rodar no ambiente é desabilitada por nome, nunca deixada "ligada e inerte".** Silenciosamente inerte é indistinguível de aprovada.
+  2. **Quando um gate não alcança uma garantia, a garantia é verificada em outro lugar e os dois pontos se referenciam.** Um gate que cobre parte do problema precisa dizer qual parte.
+  3. **Verificador que varre arquivos exclui toda saída de build por padrão**, não caso a caso.
+- **Referência**: `scripts/check-design-literals.mjs`, `tests/a11y.test.tsx`, `tests/design-tokens.test.ts`, ADR-005, ADR-011.

@@ -10,9 +10,8 @@ name: CI
 #   ativos    1 (lint/format) · 2 (typecheck) · 3 e 4 (testes + cobertura)
 #             5 (RLS, por teste estrutural) · 6 (drift de OpenAPI)
 #             8 (dependências e segredos) · 9 (imagem + Trivy)
-#             10 (design tokens: drift dos artefatos + literais) · 12 (ADRs)
-#   pendentes 7 (Axe) aguarda o Storybook; 11 (Helm) aguarda os charts terem
-#             conteúdo.
+#             7 (Axe por história do Storybook) · 10 (design tokens) · 12 (ADRs)
+#   pendentes 11 (Helm) aguarda os charts terem conteúdo.
 
 on:
   push:
@@ -32,7 +31,7 @@ env:
 
 jobs:
   qualidade:
-    name: Gates 1, 2, 6, 10 e 12
+    name: Gates 1, 2, 6, 7, 10 e 12
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -64,6 +63,12 @@ jobs:
 
       - name: Gate 10 — valor estético fora de tokens.json
         run: npm run design:literals
+
+      # O gate 7 propriamente dito roda com os testes (Axe sobre cada história). Este
+      # passo garante que a vitrine ainda COMPILA: uma história quebrada deixaria de
+      # ser testada em silêncio, e o gate passaria por ter menos o que verificar.
+      - name: Gate 7 — a vitrine do Storybook compila
+        run: npm run storybook:build
 
   testes:
     name: Gates 3, 4 e 5

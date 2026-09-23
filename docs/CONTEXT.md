@@ -29,6 +29,7 @@ Plataforma cloud-native de **ESM/ITSM** (Enterprise & IT Service Management), mu
 | **Contexto transacional**       | `withRequestContext` aplica claims com `SET LOCAL`, de modo que morram no commit e não vazem para a próxima requisição da mesma conexão de pool       |
 | **Contrato OpenAPI**            | `docs/api/openapi.json` derivado dos schemas Zod, com gate 6 verificando drift                                                                        |
 | **Design tokens**               | `design-system/build.mjs` compila `tokens.json` em `dist/tokens.css` e `dist/tailwind-theme.js` (Style Dictionary v4, ADR-011)                        |
+| **Interface**                   | Storybook com `addon-a11y`, primeiro componente consumindo os tokens compilados (ADR-005, ADR-011)                                                    |
 | **Fila assíncrona**             | `notifications` em pgmq, publicação transacional por `app.publish_event`, consumidor idempotente com DLQ (ADR-002)                                    |
 | **Empacotamento**               | `Dockerfile` multi-estágio para Distroless, `nonroot`, sem devDependencies nem fontes TS na imagem final                                              |
 | **Esteira de CI**               | `.github/workflows/` com os gates 1, 2, 3, 4, 5, 6, 8, 9 e 12 ativos                                                                                  |
@@ -44,7 +45,7 @@ Plataforma cloud-native de **ESM/ITSM** (Enterprise & IT Service Management), mu
 | 4 integração                    | ativo        | PostgreSQL real em service container                                                 |
 | 5 verificação de RLS            | ativo        | por teste estrutural, vale para toda tabela futura                                   |
 | 6 drift de OpenAPI              | ativo        |                                                                                      |
-| 7 acessibilidade                | **pendente** | aguarda o Storybook                                                                  |
+| 7 acessibilidade                | ativo        | Axe por história do Storybook; ver nota sobre o limite do jsdom                      |
 | 8 SAST, dependências e segredos | ativo        | CodeQL, `npm audit` e Gitleaks — os três executando; ver nota abaixo                 |
 | 9 imagem e Trivy                | ativo        | imagem construída e varrida no CI; base em `nodejs22-debian13` — ver ressalva abaixo |
 | 10 auditoria de design tokens   | ativo        | drift dos artefatos + literais estéticos; ver nota abaixo                            |
@@ -66,6 +67,16 @@ O workflow não é `continue-on-error` de propósito: um gate que nunca reprova 
 `tests/design-tokens.test.ts` mede cada par texto/superfície nos **dois** temas (história 11.4). Os limiares numéricos vêm da WCAG, não do `tokens.json`: o arquivo escolhe o nível (`2.2 AA`) e o teste fixa os números daquele nível. A verificação por mutação mostrou por que — com os números vindos do arquivo, baixar `contrastNormalText` para 3 deixava a suíte verde sem corrigir nada.
 
 A primeira execução reprovou 29 casos e corrigiu um defeito estrutural: `status.*` e `domain.*` eram tokens de tema escuro disfarçados de globais. Hoje declaram `text` e `dot` por tema. Ver a entrada de 2026-09-23 em `docs/PLAYBOOKS/INCIDENTS_LEARNING.md`.
+
+### O que o gate 7 cobre, e o que não cobre
+
+`tests/a11y.test.tsx` roda o Axe sobre **cada história** do Storybook — o mesmo arquivo que documenta o componente é o que o testa, então a vitrine não pode divergir do que foi verificado.
+
+O Axe roda em jsdom, que não faz layout nem resolve `var()`. As regras que dependem de pixels renderizados — `color-contrast` acima de todas — ficam inertes e estão **explicitamente desabilitadas**, em vez de passarem por vacuidade. O contraste é verificado em `tests/design-tokens.test.ts`, por cálculo direto sobre os tokens nos dois temas: uma garantia mais forte, porque cobre todas as combinações declaradas e não apenas as que alguma história por acaso renderizou.
+
+O que sobra para o Axe é o que ele faz bem e o cálculo não alcança: estrutura, papéis ARIA, nomes acessíveis, rótulos e ordem de cabeçalhos. E o que nenhum dos dois detecta — cor como único portador de informação (História 11.7) — tem teste próprio no mesmo arquivo.
+
+O job da esteira também constrói a vitrine: uma história que deixasse de compilar sairia da suíte em silêncio, e o gate passaria por ter menos o que verificar.
 
 ### O gate 10 tem duas metades
 

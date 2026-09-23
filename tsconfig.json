@@ -9,6 +9,9 @@
     },
     {
       "path": "./src/workers"
+    },
+    {
+      "path": "./src/web"
     }
   ]
 }

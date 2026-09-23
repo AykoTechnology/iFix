@@ -25,10 +25,12 @@ const RAIZ = resolve(fileURLToPath(import.meta.url), "../..");
 /** Onde o código de interface vive. A origem e os artefatos gerados ficam de fora. */
 export const PADROES = ["src/web/**/*.{ts,tsx,js,jsx,css,scss}", "src/**/*.css"];
 export const IGNORADOS = [
-  /^design-system\/dist\//,
+  // Qualquer saída de build, em qualquer pacote. Varrer artefato gerado reportaria a
+  // mesma violação duas vezes e apontaria para uma linha que ninguém edita — e o
+  // `dist/` do design system é, por definição, cheio de valores literais.
+  /(^|\/)dist\//,
   /^design-system\/tokens\.json$/,
   /\/node_modules\//,
-  /^src\/web\/src\/styles\/generated\//,
 ];
 
 // O motivo precisa começar com letra ou dígito. Um `\S+` ingênuo aceitaria o próprio

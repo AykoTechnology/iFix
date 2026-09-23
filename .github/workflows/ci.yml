@@ -1,0 +1,168 @@
+name: CI
+
+# Esteira dos gates da § 6.4 da especificação.
+#
+# Estão ativos os gates que têm artefato para verificar. Os demais NÃO aparecem aqui
+# como etapa que sempre passa: um gate que nunca reprova é indistinguível de gate
+# nenhum, e já custou um defeito real neste repositório — ver a entrada de 2026-09-22
+# em docs/PLAYBOOKS/INCIDENTS_LEARNING.md sobre o contrato OpenAPI vazio.
+#
+#   ativos    1 (lint/format) · 2 (typecheck) · 3 e 4 (testes + cobertura)
+#             5 (RLS, por teste estrutural) · 6 (drift de OpenAPI)
+#             8 (dependências e segredos) · 9 (imagem + Trivy) · 12 (ADRs)
+#   pendentes 7 (Axe) e 10 (tokens) aguardam o Storybook e o pipeline do Style
+#             Dictionary; 11 (Helm) aguarda os charts terem conteúdo.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "22"
+
+jobs:
+  qualidade:
+    name: Gates 1, 2, 6 e 12
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - run: npm ci
+
+      - name: Gate 1 — lint
+        run: npm run lint
+
+      - name: Gate 1 — formatação
+        run: npm run format
+
+      - name: Gate 2 — verificação de tipos
+        run: npm run typecheck
+
+      - name: Gate 12 — sincronia dos ADRs com a especificação
+        run: npm run adr:check
+
+      - name: Gate 6 — drift do contrato OpenAPI
+        run: npm run openapi:check
+
+  testes:
+    name: Gates 3, 4 e 5
+    runs-on: ubuntu-latest
+
+    services:
+      # ADR-018 exige banco real: as políticas RLS só existem no motor do banco, e um
+      # mock provaria apenas que concorda consigo mesmo.
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: local_dev_only
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: "5432"
+      PGDATABASE: ifix_test
+      PGPASSWORD: local_dev_only
+      PGSUPERPASSWORD: local_dev_only
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - run: npm ci
+
+      - name: Provisionar banco efêmero e aplicar migrações
+        run: ./scripts/local-db/reset.sh
+
+      - name: Gates 3, 4 e 5 — testes e cobertura
+        # A suíte inclui os testes estruturais que reprovam qualquer tabela sem RLS
+        # forçada, sem gatilho de auditoria ou com política de escrita sem WITH CHECK.
+        run: npx vitest run --coverage
+
+      - name: Publicar relatório de cobertura
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cobertura
+          path: coverage/
+          retention-days: 7
+
+  seguranca:
+    name: Gate 8 — dependências e segredos
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # o varredor de segredos precisa do histórico
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - run: npm ci
+
+      - name: Vulnerabilidades em dependências
+        run: npm audit --audit-level=high
+
+      - name: Segredos versionados
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  container:
+    name: Gate 9 — imagem Distroless e Trivy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Construir imagem
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: ifix-api:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Trivy — bloqueia CVSS ≥ 7.0
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ifix-api:${{ github.sha }}
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          severity: HIGH,CRITICAL
+
+      - name: Conferir que a imagem roda sem privilégio
+        # O ADR-001 exige nonroot. Verificar aqui evita descobrir em produção que a
+        # imagem subiu como root por um COPY que trocou o dono.
+        run: |
+          usuario=$(docker inspect --format '{{.Config.User}}' ifix-api:${{ github.sha }})
+          echo "usuário da imagem: ${usuario}"
+          [ "${usuario}" = "nonroot:nonroot" ] || { echo "esperado nonroot:nonroot"; exit 1; }

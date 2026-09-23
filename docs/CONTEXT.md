@@ -28,14 +28,40 @@ Plataforma cloud-native de **ESM/ITSM** (Enterprise & IT Service Management), mu
 | **API HTTP**                    | `src/api` — Fastify, as três probes da § 6.3, autenticação JWT, `GET /v1/people` e graceful shutdown em 25s                                           |
 | **Contexto transacional**       | `withRequestContext` aplica claims com `SET LOCAL`, de modo que morram no commit e não vazem para a próxima requisição da mesma conexão de pool       |
 | **Contrato OpenAPI**            | `docs/api/openapi.json` derivado dos schemas Zod, com gate 6 verificando drift                                                                        |
+| **Empacotamento**               | `Dockerfile` multi-estágio para Distroless, `nonroot`, sem devDependencies nem fontes TS na imagem final                                              |
+| **Esteira de CI**               | `.github/workflows/` com os gates 1, 2, 3, 4, 5, 6, 8, 9 e 12 ativos                                                                                  |
+| **Graceful shutdown**           | Provado contra o artefato **compilado**: SIGTERM e SIGINT saem com código 0, drenam e registram no log (Regra de Ouro 8)                              |
+
+### Estado dos 12 gates da esteira (§ 6.4)
+
+| Gate                            | Situação     | Observação                                                                      |
+| ------------------------------- | ------------ | ------------------------------------------------------------------------------- |
+| 1 lint e formatação             | ativo        | inclui as regras que sustentam as Regras de Ouro 7 e 11                         |
+| 2 verificação de tipos          | ativo        |                                                                                 |
+| 3 testes e cobertura            | ativo        | piso de 85%; hoje em 99,7% de linhas e 88,6% de branches                        |
+| 4 integração                    | ativo        | PostgreSQL real em service container                                            |
+| 5 verificação de RLS            | ativo        | por teste estrutural, vale para toda tabela futura                              |
+| 6 drift de OpenAPI              | ativo        |                                                                                 |
+| 7 acessibilidade                | **pendente** | aguarda o Storybook                                                             |
+| 8 SAST, dependências e segredos | ativo        | CodeQL, `npm audit`, Gitleaks                                                   |
+| 9 imagem e Trivy                | ativo        | **a primeira construção real da imagem acontecerá no CI** — ver ressalva abaixo |
+| 10 auditoria de design tokens   | **pendente** | aguarda o pipeline do Style Dictionary                                          |
+| 11 validação de charts          | **pendente** | aguarda os charts terem conteúdo                                                |
+| 12 sincronia documental         | ativo        |                                                                                 |
+
+Gates pendentes **não** têm etapa correspondente na esteira. Adicionar um passo que sempre passa produziria a ilusão de cobertura — o custo disso já foi pago uma vez neste repositório (ver playbook, entrada sobre o contrato OpenAPI vazio).
+
+### Ressalva sobre o Dockerfile
+
+Este ambiente de desenvolvimento não tem daemon Docker, então a imagem **não foi construída aqui**. O que foi verificado é a parte que costuma quebrar: o layout de runtime foi simulado em diretório separado (`npm ci --omit=dev` + `dist` copiado) e o processo subiu, respondeu às três probes e encerrou com SIGTERM. Restam sem prova local a resolução das camadas do build e a varredura do Trivy — ambas cobertas pelo job `container` da esteira, que é onde a imagem será construída pela primeira vez.
 
 ### Próximos passos imediatos (Fase 0)
 
-1. **OpenTelemetry completo** (ADR-008). Hoje o `trace-id` do `traceparent` já vira `reqId` do Fastify e chega à trilha de auditoria pela GUC `app.trace_id`; falta o SDK com exportador OTLP — **bloqueado pelo R6**, que define o destino.
-2. **Pipeline do Style Dictionary** gerando `src/web/tailwind.config.ts` a partir de `/design-system/tokens.json` (ADR-011).
-3. **Storybook** com `@storybook/addon-a11y` **antes do primeiro componente** — o ADR-005 só é bloqueante se existir o mecanismo que o bloqueia.
-4. **`Dockerfile`** multi-estágio (ADR-001) e a esteira de CI reunindo os 12 gates da § 6.4.
-5. **Fila `pgmq`** para fechar o marco de saída, que exige trace atravessando a fila.
+1. **Pipeline do Style Dictionary** gerando `src/web/tailwind.config.ts` a partir de `/design-system/tokens.json` (ADR-011) — destrava o gate 10.
+2. **Storybook** com `@storybook/addon-a11y` **antes do primeiro componente** — destrava o gate 7 e é o que torna o ADR-005 efetivo.
+3. **Fila `pgmq`** com um consumidor idempotente, para fechar o marco de saída, que exige trace atravessando a fila.
+4. **Helm charts** com `securityContext`, as três probes e `terminationGracePeriodSeconds: 30` — destrava o gate 11.
+5. **OpenTelemetry completo** (ADR-008): o `trace-id` já vira `reqId` do Fastify e chega à auditoria pela GUC `app.trace_id`; falta o SDK com exportador OTLP — **bloqueado pelo R6**, que define o destino.
 
 **Marco de saída da Fase 0:** um endpoint em produção com RLS ativa, auditoria disparando, trace atravessando a fila e token de UI aplicado — ponta a ponta.
 

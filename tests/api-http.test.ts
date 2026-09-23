@@ -154,6 +154,62 @@ describe("autenticação", () => {
   });
 });
 
+describe("falha de dependência", () => {
+  it("readiness reprova e liveness aprova quando o banco cai", async () => {
+    // É a distinção que decide se uma indisponibilidade de banco vira interrupção
+    // total: readiness em 503 tira o pod do balanceador, enquanto liveness em 200
+    // impede o Kubernetes de matá-lo. Sem este teste, nada garante que as duas probes
+    // não colapsem no mesmo comportamento.
+    const quebrado = await buildServer(
+      loadConfig({ ...config, PGPORT: "1", JWT_SECRET, NODE_ENV: "test" }),
+    );
+    try {
+      await quebrado.app.ready();
+
+      const ready = await quebrado.app.inject({ method: "GET", url: "/health/ready" });
+      expect(ready.statusCode).toBe(503);
+      expect(ready.json<{ status: string }>().status).toBe("degraded");
+
+      const startup = await quebrado.app.inject({ method: "GET", url: "/health/startup" });
+      expect(startup.statusCode).toBe(503);
+
+      const live = await quebrado.app.inject({ method: "GET", url: "/health/live" });
+      expect(live.statusCode).toBe(200);
+    } finally {
+      await quebrado.app.close();
+    }
+  }, 20_000);
+
+  it("responde 500 sem vazar detalhe do banco quando ele está indisponível", async () => {
+    const quebrado = await buildServer(
+      loadConfig({ ...config, PGPORT: "1", JWT_SECRET, NODE_ENV: "test" }),
+    );
+    try {
+      await quebrado.app.ready();
+      const token = await tokenFor({
+        sub: FIXTURES.acme.ana,
+        tenant_id: FIXTURES.acme.tenantId,
+        workspace_ids: [],
+      });
+
+      const response = await quebrado.app.inject({
+        method: "GET",
+        url: "/v1/people",
+        headers: { authorization: `Bearer ${token}` },
+      });
+
+      expect(response.statusCode).toBe(500);
+      const body = response.json<{ error: string; message: string }>();
+      expect(body).toEqual({ error: "internal_error", message: "erro interno" });
+      // Mensagem de erro de driver costuma trazer host, porta e usuário — informação
+      // de infraestrutura que não deve chegar ao cliente.
+      expect(JSON.stringify(body)).not.toMatch(/ECONNREFUSED|127\.0\.0\.1|authenticated/);
+    } finally {
+      await quebrado.app.close();
+    }
+  }, 20_000);
+});
+
 describe("recorte por locatário ponta a ponta", () => {
   it("devolve apenas as pessoas do locatário do token", async () => {
     const token = await tokenFor({

@@ -183,12 +183,13 @@ function registerPeopleRoutes(app: FastifyInstance, pool: Pool, jwtSecret: Uint8
       const token = extractBearerToken(request.headers.authorization);
       const claims = await verifyClaims(token, jwtSecret);
 
+      const traceId = extractTraceId(request.headers.traceparent as string | undefined);
       const context: RequestContext = {
         claims,
-        ...(extractTraceId(request.headers.traceparent as string | undefined) !== undefined && {
-          traceId: extractTraceId(request.headers.traceparent as string | undefined)!,
-        }),
-        ...(request.ip !== undefined && { clientIp: request.ip }),
+        clientIp: request.ip,
+        // `exactOptionalPropertyTypes` distingue ausente de undefined: a propriedade
+        // só entra no objeto quando há valor.
+        ...(traceId !== undefined && { traceId }),
       };
 
       const data = await withRequestContext(pool, context, async (client) => {

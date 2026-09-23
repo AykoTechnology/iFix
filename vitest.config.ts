@@ -10,7 +10,17 @@ export default defineConfig({
       provider: "v8",
       reporter: ["text", "lcov"],
       include: ["src/**/*.ts"],
-      exclude: ["**/dist/**", "**/*.test.ts"],
+      exclude: [
+        "**/dist/**",
+        "**/*.test.ts",
+        // Pontos de entrada de processo. São verificados executando o artefato
+        // compilado — `tests/graceful-shutdown.test.ts` sobe o index e mata com
+        // SIGTERM; `npm run openapi:check` roda o emissor. Como a execução acontece
+        // em outro processo, a instrumentação do v8 não a enxerga, e mantê-los na
+        // conta faria a métrica reportar 0% para código que está, de fato, coberto.
+        "src/api/src/index.ts",
+        "src/api/src/openapi-emit.ts",
+      ],
       thresholds: { lines: 85, functions: 85, branches: 85, statements: 85 },
     },
   },

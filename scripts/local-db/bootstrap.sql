@@ -54,5 +54,3 @@ begin
   end if;
 end
 $$;
-
-grant connect on database ifix_dev to authenticated, service_role;

@@ -40,3 +40,19 @@ Toda entrada nova é adicionada ao **topo** da lista (mais recente primeiro). Ne
   2. A suíte de vazamento inclui um teste estrutural que falha se qualquer papel de aplicação tiver `BYPASSRLS` ou `SUPERUSER` (`tests/rls.test.ts`) — a proteção não depende só do script de bootstrap.
   3. **Verificação por mutação passa a ser obrigatória** para testes de isolamento: um teste de segurança que nunca foi visto falhando não é evidência de nada. As seis mutações usadas estão documentadas no PR da fundação.
 - **Referência**: migração `20260922000001_foundation.sql`, `tests/rls.test.ts`, ADR-003, ADR-018.
+
+### 2026-09-23 — Quatro dos cinco jobs da primeira execução real da esteira reprovaram
+
+- **Sintoma**: o primeiro PR a exercitar `ci.yml` e `codeql.yml` em runners de verdade reprovou em quatro jobs, por quatro causas distintas — três delas impossíveis de observar localmente.
+- **Causas-raiz**:
+  1. **Gate 3/4/5** — `scripts/local-db/bootstrap.sql` terminava com `grant connect on database ifix_dev`, resquício de quando o banco local tinha nome fixo. O `reset.sh` já concede o mesmo acesso usando o nome real do banco. No ambiente de desenvolvimento o banco `ifix_dev` existia, então a linha era inócua; no runner efêmero, não existia e derrubava o bootstrap inteiro.
+  2. **Gate 8** — `gitleaks/gitleaks-action@v2` exige licença paga quando o repositório pertence a uma organização. A action abortou antes de varrer coisa alguma.
+  3. **Gate 9** — `aquasecurity/trivy-action@0.28.0` não existe; as tags dessa action são prefixadas com `v`. O job morreu na resolução da action, sem chegar a construir a imagem.
+  4. **CodeQL** — faltava a permissão `actions: read`; a action consulta a própria execução ao montar o relatório e terminou em `Resource not accessible by integration`.
+- **Por que é grave além do incidente**: as causas 2, 3 e 4 têm o mesmo formato — o gate **não reprovou por encontrar problema, reprovou por não ter chegado a rodar**. A diferença entre "o varredor de segredos não encontrou nada" e "o varredor de segredos não executou" não aparece no resumo do PR: as duas situações são uma linha vermelha ou verde. Um gate quebrado por configuração é o mesmo defeito documentado na entrada do contrato OpenAPI vazio, visto de outro ângulo.
+- **Mitigação aplicada**: linha residual removida do bootstrap; gitleaks passou a rodar pelo binário (MIT, sem restrição de licença) com versão fixada; `trivy-action` corrigida para `v0.36.0`; `actions: read` adicionada ao CodeQL. O gitleaks, ao rodar de fato, encontrou três ocorrências — todas o mesmo literal de segredo de teste exigido pelo validador de configuração (32 caracteres no mínimo), tratadas em `.gitleaks.toml` com recorte estreito: aquele valor específico, e só em `tests/`.
+- **Regras novas**:
+  1. **Referência a action externa é verificada contra as tags reais do repositório**, não escrita de memória. Erro de tag reprova o job de um jeito que se parece com falha de conteúdo.
+  2. **A primeira execução de um gate novo é lida no log, não no ícone.** Confirmar que ele produziu saída de análise — contagem de commits varridos, imagem construída, alertas processados — antes de considerá-lo ativo.
+  3. **Alerta de segredo em teste é silenciado pelo valor, nunca pelo diretório.** Uma alçada `tests/` inteira esconderia uma credencial real colada num teste, que é um dos caminhos reais de vazamento.
+- **Referência**: PR #22, `.github/workflows/ci.yml`, `.github/workflows/codeql.yml`, `.gitleaks.toml`, `scripts/local-db/bootstrap.sql`.

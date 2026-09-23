@@ -15,6 +15,9 @@ on:
 permissions:
   contents: read
   security-events: write
+  # A action do CodeQL consulta a própria execução para montar o relatório; sem
+  # `actions: read` ela termina em "Resource not accessible by integration".
+  actions: read
 
 jobs:
   analisar:

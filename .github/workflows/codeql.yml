@@ -1,0 +1,33 @@
+name: CodeQL
+
+# Gate 8 (parte SAST) da § 6.4. Separado do `ci.yml` porque a análise é mais lenta que
+# os demais gates e não precisa bloquear o ciclo rápido de lint e testes.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Semanal: uma consulta nova do CodeQL pode revelar um problema em código que não
+    # foi tocado desde a última execução.
+    - cron: "0 3 * * 1"
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  analisar:
+    name: Análise estática
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          queries: security-and-quality
+
+      - uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:javascript-typescript"

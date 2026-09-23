@@ -1,45 +1,58 @@
 # iFix — Plataforma Cloud-Native ESM/ITSM
 
-Plataforma de Gestão de Serviços Empresariais (ESM) e de TI (ITSM), construída do zero para Kubernetes: Node.js 22 + TypeScript estrito + Fastify, imagens Google Distroless, Supabase Self-Hosted (Postgres 16, RLS, pgmq, Realtime, GoTrue, pgvector), frontend React 19 + Tailwind com conformidade WCAG 2.2 AA obrigatória.
+Plataforma de Gestão de Serviços Empresariais (ESM) e de TI (ITSM), construída do zero para Kubernetes: Node.js 22 + TypeScript estrito + Fastify, imagens Google Distroless, Supabase Self-Hosted (PostgreSQL 16, RLS, pgmq, Realtime, GoTrue, pgvector), frontend React 19 + Tailwind com conformidade WCAG 2.2 AA obrigatória.
 
 ## Comece por aqui
 
-| Se você quer... | Leia |
-|---|---|
-| Entender a arquitetura e a stack completa | `docs/ESPECIFICACAO_TECNICA.md` |
-| Ver o estado atual do projeto e o que fazer a seguir | `docs/CONTEXT.md` |
-| Ver o backlog de produto (12 épicos, 6 fases) | `docs/BACKLOG.md` |
-| Entender uma decisão arquitetural | `docs/ADR/` |
-| Implementar UI fiel ao design | `docs/design-system/` (tokens, componentes, telas de referência) |
-| Contribuir com código | `CONTRIBUTING.md` |
+| Se você quer...                                                                              | Leia                                                                                                              |
+| -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| **A especificação completa** — arquitetura, backlog, ADRs, requisitos não-funcionais, riscos | **[`docs/ESM_ITSM_PLATFORM_SPEC.md`](docs/ESM_ITSM_PLATFORM_SPEC.md)**                                            |
+| Saber o que já existe e o que fazer a seguir                                                 | [`docs/CONTEXT.md`](docs/CONTEXT.md)                                                                              |
+| O índice de épicos e Issues                                                                  | [`docs/BACKLOG.md`](docs/BACKLOG.md)                                                                              |
+| Entender uma decisão arquitetural                                                            | [`docs/ADR/`](docs/ADR/) _(gerado da § 9 da especificação)_                                                       |
+| Implementar UI fiel ao design                                                                | [`/design-system/`](design-system/) (tokens) + [`docs/design-system/`](docs/design-system/) (componentes e telas) |
+| Contribuir com código                                                                        | [`CONTRIBUTING.md`](CONTRIBUTING.md)                                                                              |
 
 ## Estrutura do monorepo
 
 ```
 .github/          Workflows de CI/CD, templates de Issue/PR
 charts/           Helm charts (api, workers, infra)
-docs/             Documentação viva: CONTEXT.md, ADR/, BACKLOG.md, design-system/, PLAYBOOKS/, api/, runbooks/
+design-system/    tokens.json (DTCG) — fonte única de UI, compilada por Style Dictionary
+docs/             Especificação, CONTEXT.md, ADR/, design-system/, PLAYBOOKS/, api/, runbooks/
+scripts/          Utilitários de governança (ex.: sync-adrs.mjs)
 src/api/          Serviço HTTP Fastify (TypeScript estrito, Distroless)
 src/workers/      Consumidores assíncronos de filas pgmq
 src/web/          Frontend React 19 + Tailwind
-src/shared/       Tipos/Zod compartilhados, motor de workflow (ADR-004) e motor de regras (ADR-006)
+src/shared/       Zod compartilhado, motor de workflow (ADR-004) e motor de regras (ADR-006)
 supabase/         Migrações SQL versionadas + políticas RLS, seeds de desenvolvimento
 ```
 
 ## Princípios inegociáveis
 
-1. **RLS mandatório** em toda tabela de negócio (ADR-003).
-2. **Zero scripts imperativos em regra de negócio** — tudo via DSL declarativa (ADR-004) ou motor de regras (ADR-006), nunca `eval()`.
-3. **WCAG 2.2 AA é critério de bloqueio**, não meta aspiracional (ADR-005).
-4. **Imagens Distroless**, `nonroot`, sistema de arquivos somente leitura (ADR-001).
-5. **Consumidores de fila idempotentes** (ADR-002).
+1. **RLS mandatório** em toda tabela de negócio, em dois eixos: locatário e espaço de serviço (ADR-003, ADR-012).
+2. **Auditoria universal automática** por trigger de banco, imutável (ADR-007).
+3. **Zero scripts imperativos em regra de negócio** — DSL declarativa (ADR-004) ou motor de regras (ADR-006), nunca `eval()`.
+4. **WCAG 2.2 AA é critério de bloqueio**, com mecanismo de CI que o sustenta (ADR-005).
+5. **Imagens Distroless**, `nonroot`, sistema de arquivos somente leitura (ADR-001).
+6. **Consumidores de fila idempotentes** — `pgmq` é _at-least-once_ (ADR-002).
+7. **Fonte única para cada contrato**: API vem do Zod (ADR-009), UI vem do `tokens.json` (ADR-011).
 
-A lista completa está em `docs/CONTEXT.md` § "Regras de Ouro".
+As 11 Regras de Ouro, cada uma com o gate de CI que a torna mecânica, estão na § 10.1 da especificação.
 
 ## Status
 
-Fase 0 — Fundação (documentação viva e scaffolding). Nenhum código de aplicação foi escrito ainda. Ver `docs/CONTEXT.md` § "Próximos passos imediatos".
+**Fase 0 — Fundação.** Documentação viva, ADRs, backlog e tokens de design estabelecidos; nenhum código de aplicação escrito ainda. Ver `docs/CONTEXT.md` § 1.
+
+## Governança de documentação
+
+Os arquivos em `docs/ADR/` são **gerados** a partir da § 9 da especificação:
+
+```bash
+node scripts/sync-adrs.mjs          # regenera os ADRs
+node scripts/sync-adrs.mjs --check  # falha se houver divergência (gate 12 da esteira)
+```
 
 ## Licença
 
-Definição pendente — ver `docs/BACKLOG.md` § Pendências.
+Pendente de definição — ver risco **R11** na § 12 da especificação.

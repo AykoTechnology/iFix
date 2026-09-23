@@ -4,11 +4,13 @@
 
 ## Arquivos
 
-| Arquivo | Conteúdo |
-|---|---|
-| `tokens.json` | Cores, tipografia, espaçamento, raio, elevação, layout e critérios de acessibilidade em formato consumível (gera `tailwind.config` e tokens CSS). |
-| `components.md` | Inventário de componentes de UI com estados e regras de uso. |
-| `screens.md` | As 7 telas de referência prototipadas, mapeadas para módulos do produto e para os épicos do backlog. |
+Este diretório contém a **documentação** de design. O artefato **compilável** (tokens) vive em `/design-system/` na raiz do repositório, conforme a estrutura de monorepo da §6.1 da especificação.
+
+| Arquivo                               | Conteúdo                                                                                                                                                                 |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `components.md`                       | Inventário de componentes de UI com estados e regras de uso.                                                                                                             |
+| `screens.md`                          | As 7 telas de referência prototipadas, mapeadas para módulos do produto e para os épicos do backlog.                                                                     |
+| `/design-system/tokens.json` _(raiz)_ | Cores, tipografia, espaçamento, raio, elevação, layout e acessibilidade no formato DTCG, compilados por Style Dictionary para o Tailwind e para variáveis CSS (ADR-011). |
 
 ## Princípios de marca
 
@@ -20,11 +22,14 @@
 
 ## Tipografia
 
-- **Gilroy** — títulos e números (Light/Regular/Medium/Bold).
-- **Lufga** — interface e corpo de texto (Regular/Medium).
+- **Outfit** — títulos, números, interface e corpo de texto (Light/Regular/Medium/Bold).
 - **JetBrains Mono** — números de chamado (`INC-48192`), IDs de CI (`CI-SRV-0231`), timestamps ISO 8601 e qualquer representação de schema JSON visível ao usuário.
 
-Fallback de carregamento: `Outfit` (Google Fonts) + `system-ui, sans-serif`, já que Gilroy/Lufga são fontes licenciadas que precisam ser hospedadas como `@font-face` self-hosted em produção (ação pendente: obter os arquivos de fonte licenciados antes do lançamento — ver `docs/CONTEXT.md` § Pendências).
+> **Nota histórica:** o design system original especificava **Gilroy** (display) e **Lufga** (corpo), ambas comerciais. O protótipo nunca as carregou — não havia `@font-face` algum, e o único `<link>` de fonte trazia Outfit e JetBrains Mono. Elas só renderizavam em máquina que já as tivesse instaladas, de modo que a revisão de design ocorreu de fato exibindo Outfit. O **ADR-020** formalizou Outfit como a família do sistema.
+
+Ambas as famílias são **self-hosted** (SIL OFL), servidas pela própria aplicação. Nenhuma fonte vem de CDN de terceiros em tempo de execução — ver `design-system/README.md` para as regras que decorrem do ADR-020.
+
+Pilha completa: `Outfit, system-ui, sans-serif` para texto; `JetBrains Mono, ui-monospace, monospace` para identificadores e timestamps.
 
 ## Grid e responsividade
 

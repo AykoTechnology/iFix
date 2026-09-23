@@ -1,0 +1,28 @@
+# Tudo que não precisa entrar no contexto de build. Reduz o tamanho enviado ao daemon
+# e, principalmente, evita que artefato local vaze para dentro da imagem.
+
+node_modules/
+**/node_modules/
+**/dist/
+**/*.tsbuildinfo
+coverage/
+
+.git/
+.github/
+docs/
+charts/
+design-system/
+supabase/
+scripts/
+tests/
+
+**/*.test.ts
+**/*.md
+.env
+.env.*
+!.env.example
+
+.prettierrc.json
+.prettierignore
+eslint.config.js
+vitest.config.ts

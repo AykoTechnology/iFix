@@ -1,0 +1,10 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "composite": false,
+    "types": ["node"],
+    "paths": { "@ifix/shared": ["../src/shared/src/index.ts"] }
+  },
+  "include": ["**/*.ts"]
+}

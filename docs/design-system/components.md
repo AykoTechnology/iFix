@@ -4,14 +4,14 @@ Transcrito da seção 05 do handoff (`iFix Design System.dc.html`). Cada compone
 
 ## Botões
 
-| Variante | Uso | Estado hover |
-|---|---|---|
-| Primário (`#723CEB` sólido) | Uma ação primária por tela | `#8457F0` |
-| Secundário (borda `#3A3A41`) | Ação alternativa | borda `#5B5B66` + fundo `#1A1A1C` |
-| Terciário/texto | Ação de baixo peso (Cancelar) | fundo `#1A1A1C` |
-| Destrutivo (`#FF4D4D` translúcido) | Ações irreversíveis/perigosas (ex.: declarar incidente massivo) | fundo mais opaco |
-| Desabilitado | `cursor:not-allowed`, texto `#6E6E76` sobre `#1A1A1C` | — |
-| Pequeno | Densidade alta (tabelas, toolbars) | — |
+| Variante                           | Uso                                                             | Estado hover                      |
+| ---------------------------------- | --------------------------------------------------------------- | --------------------------------- |
+| Primário (`#723CEB` sólido)        | Uma ação primária por tela                                      | `#8457F0`                         |
+| Secundário (borda `#3A3A41`)       | Ação alternativa                                                | borda `#5B5B66` + fundo `#1A1A1C` |
+| Terciário/texto                    | Ação de baixo peso (Cancelar)                                   | fundo `#1A1A1C`                   |
+| Destrutivo (`#FF4D4D` translúcido) | Ações irreversíveis/perigosas (ex.: declarar incidente massivo) | fundo mais opaco                  |
+| Desabilitado                       | `cursor:not-allowed`, texto `#6E6E76` sobre `#1A1A1C`           | —                                 |
+| Pequeno                            | Densidade alta (tabelas, toolbars)                              | —                                 |
 
 Regra: alvo mínimo 44×44px, foco visível de 3px em todos os estados.
 
@@ -63,12 +63,12 @@ Regra: alvo mínimo 44×44px, foco visível de 3px em todos os estados.
 
 ## Estados de sistema
 
-| Estado | Regra |
-|---|---|
-| Vazio | Ilustração com gradiente de marca (único uso decorativo permitido do gradiente) + explicação do que preencherá o espaço |
-| Carregando | Skeleton com a forma do conteúdo real + `aria-busy` no contêiner — nunca spinner genérico isolado em telas de lista |
-| Erro | Explica a causa técnica em linguagem simples, mostra timestamp do último dado válido exibido, oferece "Tentar novamente" + "Ver status" |
-| Acesso negado | Explica a política de isolamento (RLS/partição departamental) e oferece "Solicitar acesso ao espaço" — nunca um 403 genérico |
+| Estado        | Regra                                                                                                                                   |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Vazio         | Ilustração com gradiente de marca (único uso decorativo permitido do gradiente) + explicação do que preencherá o espaço                 |
+| Carregando    | Skeleton com a forma do conteúdo real + `aria-busy` no contêiner — nunca spinner genérico isolado em telas de lista                     |
+| Erro          | Explica a causa técnica em linguagem simples, mostra timestamp do último dado válido exibido, oferece "Tentar novamente" + "Ver status" |
+| Acesso negado | Explica a política de isolamento (RLS/partição departamental) e oferece "Solicitar acesso ao espaço" — nunca um 403 genérico            |
 
 ## Blocos do FlowBuilder (motor de fluxo declarativo)
 

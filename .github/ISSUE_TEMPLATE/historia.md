@@ -12,12 +12,14 @@ labels: story
 ## Critérios de aceite
 
 <!-- lista objetiva e testável -->
+
 - [ ]
 - [ ]
 
 ## Contratos de engenharia aplicáveis
 
 <!-- marcar o que se aplica; remover o que não -->
+
 - [ ] Exige nova política RLS (ADR-003)
 - [ ] Exige novo consumidor de fila idempotente (ADR-002)
 - [ ] Exige schema Zod novo/alterado + regeneração de OpenAPI (ADR-009)

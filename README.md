@@ -18,7 +18,7 @@ Plataforma de Gestão de Serviços Empresariais (ESM) e de TI (ITSM), construíd
 ```
 .github/          Workflows de CI/CD, templates de Issue/PR
 charts/           Helm charts (api, workers, infra)
-design-system/    tokens.json (DTCG) — fonte única de UI, compilada por Style Dictionary
+design-system/    tokens.json (DTCG) — fonte única de UI · build.mjs compila para dist/ (CSS + tema Tailwind)
 docs/             Especificação, CONTEXT.md, ADR/, design-system/, PLAYBOOKS/, api/, runbooks/
 scripts/          Governança (sync-adrs.mjs) e provisionamento do banco local/CI (local-db/)
 src/api/          Serviço HTTP Fastify (TypeScript estrito, Distroless)
@@ -47,10 +47,11 @@ As 11 Regras de Ouro, cada uma com o gate de CI que a torna mecânica, estão na
 
 - **Banco**: migração de fundação com o padrão de referência de RLS nos dois eixos, auditoria por trigger imutável e `uuid_generate_v7()`.
 - **API**: servidor Fastify com contexto de requisição aplicado por GUC transacional, três probes distintas e contrato OpenAPI 3.1 derivado do Zod.
-- **Esteira**: 9 dos 12 gates da § 6.4 ativos; imagem Distroless `nonroot` com varredura Trivy.
+- **Design**: `tokens.json` compilado por Style Dictionary em variáveis CSS e tema do Tailwind, com gate de drift e de literal estético.
+- **Esteira**: 10 dos 12 gates da § 6.4 ativos; imagem Distroless `nonroot` com varredura Trivy.
 - **Testes**: 63 testes contra PostgreSQL real, incluindo testes estruturais que reprovam qualquer tabela sem RLS forçada.
 
-Pendentes da fase: pipeline do Style Dictionary (gate 10), Storybook com addon-a11y (gate 7), Helm charts (gate 11), fila `pgmq` com consumidor idempotente e SDK OpenTelemetry. Ver `docs/CONTEXT.md` § 1.
+Pendentes da fase: Storybook com addon-a11y (gate 7), Helm charts (gate 11), fila `pgmq` com consumidor idempotente e SDK OpenTelemetry. Ver `docs/CONTEXT.md` § 1.
 
 ## Governança de documentação
 

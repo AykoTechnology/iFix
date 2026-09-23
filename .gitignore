@@ -4,6 +4,10 @@ node_modules/
 
 # Build output
 dist/
+# Exceção: os artefatos de design são VERSIONADOS de propósito. O gate 10 compara o
+# compilado com o que está no repositório — se não estiver versionado, não há com o
+# que comparar, e o gate reprova por ausência em vez de por divergência.
+!design-system/dist/
 build/
 .next/
 *.tsbuildinfo

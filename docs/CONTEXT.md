@@ -28,6 +28,7 @@ Plataforma cloud-native de **ESM/ITSM** (Enterprise & IT Service Management), mu
 | **API HTTP**                    | `src/api` — Fastify, as três probes da § 6.3, autenticação JWT, `GET /v1/people` e graceful shutdown em 25s                                           |
 | **Contexto transacional**       | `withRequestContext` aplica claims com `SET LOCAL`, de modo que morram no commit e não vazem para a próxima requisição da mesma conexão de pool       |
 | **Contrato OpenAPI**            | `docs/api/openapi.json` derivado dos schemas Zod, com gate 6 verificando drift                                                                        |
+| **Design tokens**               | `design-system/build.mjs` compila `tokens.json` em `dist/tokens.css` e `dist/tailwind-theme.js` (Style Dictionary v4, ADR-011)                        |
 | **Empacotamento**               | `Dockerfile` multi-estágio para Distroless, `nonroot`, sem devDependencies nem fontes TS na imagem final                                              |
 | **Esteira de CI**               | `.github/workflows/` com os gates 1, 2, 3, 4, 5, 6, 8, 9 e 12 ativos                                                                                  |
 | **Graceful shutdown**           | Provado contra o artefato **compilado**: SIGTERM e SIGINT saem com código 0, drenam e registram no log (Regra de Ouro 8)                              |
@@ -45,7 +46,7 @@ Plataforma cloud-native de **ESM/ITSM** (Enterprise & IT Service Management), mu
 | 7 acessibilidade                | **pendente** | aguarda o Storybook                                                                  |
 | 8 SAST, dependências e segredos | ativo        | CodeQL, `npm audit` e Gitleaks — os três executando; ver nota abaixo                 |
 | 9 imagem e Trivy                | ativo        | imagem construída e varrida no CI; base em `nodejs22-debian13` — ver ressalva abaixo |
-| 10 auditoria de design tokens   | **pendente** | aguarda o pipeline do Style Dictionary                                               |
+| 10 auditoria de design tokens   | ativo        | drift dos artefatos + literais estéticos; ver nota abaixo                            |
 | 11 validação de charts          | **pendente** | aguarda os charts terem conteúdo                                                     |
 | 12 sincronia documental         | ativo        |                                                                                      |
 
@@ -58,6 +59,22 @@ Registrado porque a dependência não é óbvia pelo workflow e voltará a morde
 O GHAS foi habilitado e o CodeQL passou a rodar — a parte SAST do gate 8 está ativa. Se o licenciamento for removido, o check volta a falhar por configuração, não por achado; a distinção está no log, não no ícone.
 
 O workflow não é `continue-on-error` de propósito: um gate que nunca reprova é indistinguível de gate nenhum. Enquanto a varredura estava bloqueada, a lacuna ficou registrada nesta tabela em vez de mascarada na esteira.
+
+### Conformidade de contraste é verificada, não presumida
+
+`tests/design-tokens.test.ts` mede cada par texto/superfície nos **dois** temas (história 11.4). Os limiares numéricos vêm da WCAG, não do `tokens.json`: o arquivo escolhe o nível (`2.2 AA`) e o teste fixa os números daquele nível. A verificação por mutação mostrou por que — com os números vindos do arquivo, baixar `contrastNormalText` para 3 deixava a suíte verde sem corrigir nada.
+
+A primeira execução reprovou 29 casos e corrigiu um defeito estrutural: `status.*` e `domain.*` eram tokens de tema escuro disfarçados de globais. Hoje declaram `text` e `dot` por tema. Ver a entrada de 2026-09-23 em `docs/PLAYBOOKS/INCIDENTS_LEARNING.md`.
+
+### O gate 10 tem duas metades
+
+A primeira é **drift**: `npm run tokens:check` recompila `tokens.json` e compara com o que está versionado em `design-system/dist/`. Mesmo mecanismo do gate 6 — o artefato nunca é editado à mão, e divergir reprova.
+
+A segunda é **literais**: `npm run design:literals` varre o código de interface atrás de hexadecimal, `rgb()`, medida em `px`/`rem` e classe utilitária arbitrária do Tailwind (`bg-[#723CEB]`).
+
+Enquanto `src/web/` estiver vazio, a segunda metade varre **zero arquivo** e passa. Isso é declarado no log do job, não escondido, e a verificação é exercitada por fixtures em `tests/design-literals.test.ts` que provam que cada regra reprova de fato. É a aplicação direta da lição das duas entradas anteriores do playbook: um verificador que nunca viu uma violação não é evidência de nada.
+
+Dispensa pontual existe com `tokens-exempt: <motivo>` na linha. O motivo é obrigatório e verificado — `tokens-exempt:` sozinho não silencia.
 
 ### Ressalva sobre o Dockerfile
 

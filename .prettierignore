@@ -8,4 +8,4 @@ package-lock.json
 # gate de formatação (gate 1), e o perdedor seria quem abrisse o PR.
 docs/ADR/
 docs/api/openapi.json
-design-system/build/
+design-system/dist/

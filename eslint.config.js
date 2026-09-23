@@ -20,7 +20,11 @@ export default tseslint.config(
         // Os arquivos de configuração da raiz não pertencem a nenhum tsconfig de
         // pacote; sem esta exceção o linter falha ao tentar tipá-los.
         projectService: {
-          allowDefaultProject: ["eslint.config.js", "vitest.config.ts"],
+          allowDefaultProject: [
+            "eslint.config.js",
+            "vitest.config.ts",
+            "scripts/check-design-literals.d.mts",
+          ],
         },
         tsconfigRootDir: import.meta.dirname,
       },
@@ -47,7 +51,7 @@ export default tseslint.config(
   },
 
   {
-    files: ["**/*.test.ts", "scripts/**/*.mjs", "**/*.config.*"],
+    files: ["**/*.test.ts", "**/*.mjs", "**/*.config.*"],
     rules: {
       "no-console": "off",
       "@typescript-eslint/no-unsafe-assignment": "off",
@@ -56,9 +60,10 @@ export default tseslint.config(
   },
 
   {
-    // Scripts de governança e arquivos de configuração da raiz não fazem parte de um
-    // projeto TypeScript; as regras que exigem informação de tipo não se aplicam.
-    files: ["scripts/**/*.mjs", "eslint.config.js", "vitest.config.ts"],
+    // Scripts de governança, o compilador de design tokens e os arquivos de
+    // configuração da raiz não fazem parte de um projeto TypeScript; as regras que
+    // exigem informação de tipo não se aplicam.
+    files: ["**/*.mjs", "**/*.d.mts", "eslint.config.js", "vitest.config.ts"],
     ...tseslint.configs.disableTypeChecked,
   },
 );

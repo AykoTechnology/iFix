@@ -9,9 +9,10 @@ name: CI
 #
 #   ativos    1 (lint/format) · 2 (typecheck) · 3 e 4 (testes + cobertura)
 #             5 (RLS, por teste estrutural) · 6 (drift de OpenAPI)
-#             8 (dependências e segredos) · 9 (imagem + Trivy) · 12 (ADRs)
-#   pendentes 7 (Axe) e 10 (tokens) aguardam o Storybook e o pipeline do Style
-#             Dictionary; 11 (Helm) aguarda os charts terem conteúdo.
+#             8 (dependências e segredos) · 9 (imagem + Trivy)
+#             10 (design tokens: drift dos artefatos + literais) · 12 (ADRs)
+#   pendentes 7 (Axe) aguarda o Storybook; 11 (Helm) aguarda os charts terem
+#             conteúdo.
 
 on:
   push:
@@ -31,7 +32,7 @@ env:
 
 jobs:
   qualidade:
-    name: Gates 1, 2, 6 e 12
+    name: Gates 1, 2, 6, 10 e 12
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -57,6 +58,12 @@ jobs:
 
       - name: Gate 6 — drift do contrato OpenAPI
         run: npm run openapi:check
+
+      - name: Gate 10 — drift dos artefatos de design
+        run: npm run tokens:check
+
+      - name: Gate 10 — valor estético fora de tokens.json
+        run: npm run design:literals
 
   testes:
     name: Gates 3, 4 e 5

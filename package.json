@@ -23,7 +23,10 @@
     "adr:check": "node scripts/sync-adrs.mjs --check",
     "openapi": "tsc --build && node src/api/dist/openapi-emit.js",
     "openapi:check": "tsc --build && node src/api/dist/openapi-emit.js --check",
-    "verify": "npm run lint && npm run format && npm run typecheck && npm run adr:check && npm run openapi:check && npm run test"
+    "verify": "npm run lint && npm run format && npm run typecheck && npm run adr:check && npm run openapi:check && npm run tokens:check && npm run design:literals && npm run test",
+    "tokens": "node design-system/build.mjs",
+    "tokens:check": "node design-system/build.mjs --check",
+    "design:literals": "node scripts/check-design-literals.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.37.0",
@@ -33,6 +36,7 @@
     "eslint": "^9.37.0",
     "globals": "^16.4.0",
     "prettier": "^3.6.2",
+    "style-dictionary": "^4.4.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.45.0",
     "vitest": "^3.2.4"

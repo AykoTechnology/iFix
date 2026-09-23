@@ -23,7 +23,7 @@
     "adr:check": "node scripts/sync-adrs.mjs --check",
     "openapi": "tsc --build && node src/api/dist/openapi-emit.js",
     "openapi:check": "tsc --build && node src/api/dist/openapi-emit.js --check",
-    "verify": "npm run lint && npm run typecheck && npm run adr:check && npm run openapi:check && npm run test"
+    "verify": "npm run lint && npm run format && npm run typecheck && npm run adr:check && npm run openapi:check && npm run test"
   },
   "devDependencies": {
     "@eslint/js": "^9.37.0",

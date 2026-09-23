@@ -34,22 +34,28 @@ Plataforma cloud-native de **ESM/ITSM** (Enterprise & IT Service Management), mu
 
 ### Estado dos 12 gates da esteira (§ 6.4)
 
-| Gate                            | Situação     | Observação                                                                      |
-| ------------------------------- | ------------ | ------------------------------------------------------------------------------- |
-| 1 lint e formatação             | ativo        | inclui as regras que sustentam as Regras de Ouro 7 e 11                         |
-| 2 verificação de tipos          | ativo        |                                                                                 |
-| 3 testes e cobertura            | ativo        | piso de 85%; hoje em 99,7% de linhas e 88,6% de branches                        |
-| 4 integração                    | ativo        | PostgreSQL real em service container                                            |
-| 5 verificação de RLS            | ativo        | por teste estrutural, vale para toda tabela futura                              |
-| 6 drift de OpenAPI              | ativo        |                                                                                 |
-| 7 acessibilidade                | **pendente** | aguarda o Storybook                                                             |
-| 8 SAST, dependências e segredos | ativo        | CodeQL, `npm audit`, Gitleaks                                                   |
+| Gate                            | Situação     | Observação                                                                           |
+| ------------------------------- | ------------ | ------------------------------------------------------------------------------------ |
+| 1 lint e formatação             | ativo        | inclui as regras que sustentam as Regras de Ouro 7 e 11                              |
+| 2 verificação de tipos          | ativo        |                                                                                      |
+| 3 testes e cobertura            | ativo        | piso de 85%; hoje em 99,7% de linhas e 88,6% de branches                             |
+| 4 integração                    | ativo        | PostgreSQL real em service container                                                 |
+| 5 verificação de RLS            | ativo        | por teste estrutural, vale para toda tabela futura                                   |
+| 6 drift de OpenAPI              | ativo        |                                                                                      |
+| 7 acessibilidade                | **pendente** | aguarda o Storybook                                                                  |
+| 8 SAST, dependências e segredos | **parcial**  | `npm audit` e Gitleaks ativos; CodeQL bloqueado — ver nota abaixo                    |
 | 9 imagem e Trivy                | ativo        | imagem construída e varrida no CI; base em `nodejs22-debian13` — ver ressalva abaixo |
-| 10 auditoria de design tokens   | **pendente** | aguarda o pipeline do Style Dictionary                                          |
-| 11 validação de charts          | **pendente** | aguarda os charts terem conteúdo                                                |
-| 12 sincronia documental         | ativo        |                                                                                 |
+| 10 auditoria de design tokens   | **pendente** | aguarda o pipeline do Style Dictionary                                               |
+| 11 validação de charts          | **pendente** | aguarda os charts terem conteúdo                                                     |
+| 12 sincronia documental         | ativo        |                                                                                      |
 
 Gates pendentes **não** têm etapa correspondente na esteira. Adicionar um passo que sempre passa produziria a ilusão de cobertura — o custo disso já foi pago uma vez neste repositório (ver playbook, entrada sobre o contrato OpenAPI vazio).
+
+### CodeQL depende de GitHub Advanced Security
+
+O workflow `codeql.yml` está correto, mas não executa: o repositório é privado numa organização sem **GitHub Advanced Security**, e a varredura de código exige esse licenciamento. O erro é `Advanced Security must be enabled for this repository to use code scanning`.
+
+A decisão foi **habilitar o GHAS**, o que preserva o CodeQL, a aba Security e o histórico de alertas. Enquanto a habilitação não ocorrer — é ação de administrador da organização —, o check permanece vermelho e a parte SAST do gate 8 está **inativa**. O workflow não foi marcado como `continue-on-error` de propósito: um gate que nunca reprova é indistinguível de gate nenhum, e a tabela acima registra a lacuna em vez de escondê-la.
 
 ### Ressalva sobre o Dockerfile
 

@@ -8,7 +8,7 @@ import tseslint from "typescript-eslint";
  * que depende de o revisor lembrar não é contrato, é intenção.
  */
 export default tseslint.config(
-  { ignores: ["**/dist/**", "**/node_modules/**", "**/coverage/**", "design-system/build/**"] },
+  { ignores: ["**/dist/**", "**/node_modules/**", "**/coverage/**", "design-system/dist/**"] },
 
   js.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,

@@ -40,3 +40,32 @@ Toda entrada nova é adicionada ao **topo** da lista (mais recente primeiro). Ne
   2. A suíte de vazamento inclui um teste estrutural que falha se qualquer papel de aplicação tiver `BYPASSRLS` ou `SUPERUSER` (`tests/rls.test.ts`) — a proteção não depende só do script de bootstrap.
   3. **Verificação por mutação passa a ser obrigatória** para testes de isolamento: um teste de segurança que nunca foi visto falhando não é evidência de nada. As seis mutações usadas estão documentadas no PR da fundação.
 - **Referência**: migração `20260922000001_foundation.sql`, `tests/rls.test.ts`, ADR-003, ADR-018.
+
+### 2026-09-23 — Quatro dos cinco jobs da primeira execução real da esteira reprovaram
+
+- **Sintoma**: o primeiro PR a exercitar `ci.yml` e `codeql.yml` em runners de verdade reprovou em quatro jobs, por quatro causas distintas — três delas impossíveis de observar localmente.
+- **Causas-raiz**:
+  1. **Gate 3/4/5** — `scripts/local-db/bootstrap.sql` terminava com `grant connect on database ifix_dev`, resquício de quando o banco local tinha nome fixo. O `reset.sh` já concede o mesmo acesso usando o nome real do banco. No ambiente de desenvolvimento o banco `ifix_dev` existia, então a linha era inócua; no runner efêmero, não existia e derrubava o bootstrap inteiro.
+  2. **Gate 8** — `gitleaks/gitleaks-action@v2` exige licença paga quando o repositório pertence a uma organização. A action abortou antes de varrer coisa alguma.
+  3. **Gate 9** — `aquasecurity/trivy-action@0.28.0` não existe; as tags dessa action são prefixadas com `v`. O job morreu na resolução da action, sem chegar a construir a imagem.
+  4. **CodeQL** — faltava a permissão `actions: read`; a action consulta a própria execução ao montar o relatório e terminou em `Resource not accessible by integration`.
+- **Por que é grave além do incidente**: as causas 2, 3 e 4 têm o mesmo formato — o gate **não reprovou por encontrar problema, reprovou por não ter chegado a rodar**. A diferença entre "o varredor de segredos não encontrou nada" e "o varredor de segredos não executou" não aparece no resumo do PR: as duas situações são uma linha vermelha ou verde. Um gate quebrado por configuração é o mesmo defeito documentado na entrada do contrato OpenAPI vazio, visto de outro ângulo.
+- **Mitigação aplicada**: linha residual removida do bootstrap; gitleaks passou a rodar pelo binário (MIT, sem restrição de licença) com versão fixada; `trivy-action` corrigida para `v0.36.0`; `actions: read` adicionada ao CodeQL. O gitleaks, ao rodar de fato, encontrou três ocorrências — todas o mesmo literal de segredo de teste exigido pelo validador de configuração (32 caracteres no mínimo), tratadas em `.gitleaks.toml` com recorte estreito: aquele valor específico, e só em `tests/`.
+- **Regras novas**:
+  1. **Referência a action externa é verificada contra as tags reais do repositório**, não escrita de memória. Erro de tag reprova o job de um jeito que se parece com falha de conteúdo.
+  2. **A primeira execução de um gate novo é lida no log, não no ícone.** Confirmar que ele produziu saída de análise — contagem de commits varridos, imagem construída, alertas processados — antes de considerá-lo ativo.
+  3. **Alerta de segredo em teste é silenciado pelo valor, nunca pelo diretório.** Uma alçada `tests/` inteira esconderia uma credencial real colada num teste, que é um dos caminhos reais de vazamento.
+- **Referência**: PR #22, `.github/workflows/ci.yml`, `.github/workflows/codeql.yml`, `.gitleaks.toml`, `scripts/local-db/bootstrap.sql`.
+
+### 2026-09-23 — Gate 9 reprovou com razão na primeira varredura: 6 CVEs na base Distroless
+
+- **Sintoma**: com a `trivy-action` corrigida, o job `container` construiu a imagem sem erro e o Trivy reprovou com 6 vulnerabilidades em `libssl3` — 1 crítica (`CVE-2026-31789`) e 5 altas — todas com correção disponível a montante.
+- **Causa-raiz**: `gcr.io/distroless/nodejs22-debian12` carrega `libssl3` 3.0.18-1~deb12u2; as correções estão em 3.0.19 e 3.0.20. A base ainda não foi reconstruída a montante com o pacote atualizado. **Distroless não tem gerenciador de pacotes nem shell**, então não existe `apt upgrade` dentro da imagem: a única correção possível é trocar a base.
+- **Por que não virou exceção**: a saída fácil seria `.trivyignore` com prazo. Antes disso, a pergunta certa era se existe base sem o defeito — e existe. A variante `nodejs22-debian13` usa o mesmo Node 22 LTS exigido pelo ADR-001 e varre **limpa**. Trocar corrige de verdade; ignorar apenas adia, mantendo o risco e gastando o gate.
+- **Como foi verificado sem Docker**: o Trivy escaneia imagem direto do registro, sem daemon. Isso permitiu comparar as duas variantes e confirmar `nonroot:x:65532` no `/etc/passwd` da nova base antes de trocar, em vez de descobrir no runner.
+- **Achado secundário**: a asserção de `nonroot` vinha **depois** do Trivy no job, então a reprovação por CVE abortou o passo e a invariante do ADR-001 nunca foi verificada. A ordem foi invertida: asserções sobre invariantes nossas rodam antes das verificações sobre higiene de terceiros, porque um problema alheio não pode esconder se o nosso próprio requisito foi cumprido.
+- **Regras novas**:
+  1. **Base de imagem vulnerável se troca, não se ignora**, enquanto existir variante equivalente sem o defeito. `.trivyignore` é último recurso, sempre com prazo.
+  2. **A tag da base permanece flutuante.** Fixar por digest congelaria a imagem na versão vulnerável; a reconstrução periódica a montante é o mecanismo que mantém as correções chegando.
+  3. **Num mesmo job, verificação de invariante nossa vem antes de varredura de terceiro.**
+- **Referência**: PR #23, `Dockerfile`, `.github/workflows/ci.yml`, ADR-001.

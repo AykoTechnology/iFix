@@ -1,0 +1,20 @@
+# Configuração do varredor de segredos (gate 8 da § 6.4).
+#
+# Estende o conjunto de regras padrão em vez de substituí-lo: uma configuração
+# própria escrita do zero herdaria apenas as regras que alguém lembrou de copiar.
+[extend]
+useDefault = true
+
+[allowlist]
+description = """
+Segredo de teste usado pelas suítes. O validador de configuração exige JWT_SECRET
+com 32 caracteres ou mais, então o valor precisa ser um literal longo — e é
+exatamente disso que a heurística `generic-api-key` desconfia.
+
+O recorte é deliberadamente estreito: casa este valor específico e só em `tests/`.
+Silenciar a regra para o diretório inteiro esconderia uma credencial real colada
+num teste, que é justamente um dos caminhos pelos quais segredos vazam.
+"""
+paths = ['''^tests/''']
+regexes = ['''segredo-de-teste-com-mais-de-32-caracteres''']
+regexTarget = "match"

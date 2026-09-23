@@ -20,12 +20,13 @@ Plataforma de Gestão de Serviços Empresariais (ESM) e de TI (ITSM), construíd
 charts/           Helm charts (api, workers, infra)
 design-system/    tokens.json (DTCG) — fonte única de UI, compilada por Style Dictionary
 docs/             Especificação, CONTEXT.md, ADR/, design-system/, PLAYBOOKS/, api/, runbooks/
-scripts/          Utilitários de governança (ex.: sync-adrs.mjs)
+scripts/          Governança (sync-adrs.mjs) e provisionamento do banco local/CI (local-db/)
 src/api/          Serviço HTTP Fastify (TypeScript estrito, Distroless)
 src/workers/      Consumidores assíncronos de filas pgmq
 src/web/          Frontend React 19 + Tailwind
 src/shared/       Zod compartilhado, motor de workflow (ADR-004) e motor de regras (ADR-006)
 supabase/         Migrações SQL versionadas + políticas RLS, seeds de desenvolvimento
+tests/            Suíte de integração contra PostgreSQL real (ADR-018), sem mocks
 ```
 
 ## Princípios inegociáveis
@@ -42,7 +43,14 @@ As 11 Regras de Ouro, cada uma com o gate de CI que a torna mecânica, estão na
 
 ## Status
 
-**Fase 0 — Fundação.** Documentação viva, ADRs, backlog e tokens de design estabelecidos; nenhum código de aplicação escrito ainda. Ver `docs/CONTEXT.md` § 1.
+**Fase 0 — Fundação, em andamento.** Além da documentação viva, ADRs, backlog e tokens de design, já existe código executável:
+
+- **Banco**: migração de fundação com o padrão de referência de RLS nos dois eixos, auditoria por trigger imutável e `uuid_generate_v7()`.
+- **API**: servidor Fastify com contexto de requisição aplicado por GUC transacional, três probes distintas e contrato OpenAPI 3.1 derivado do Zod.
+- **Esteira**: 9 dos 12 gates da § 6.4 ativos; imagem Distroless `nonroot` com varredura Trivy.
+- **Testes**: 63 testes contra PostgreSQL real, incluindo testes estruturais que reprovam qualquer tabela sem RLS forçada.
+
+Pendentes da fase: pipeline do Style Dictionary (gate 10), Storybook com addon-a11y (gate 7), Helm charts (gate 11), fila `pgmq` com consumidor idempotente e SDK OpenTelemetry. Ver `docs/CONTEXT.md` § 1.
 
 ## Governança de documentação
 

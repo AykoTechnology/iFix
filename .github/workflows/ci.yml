@@ -127,10 +127,18 @@ jobs:
       - name: Vulnerabilidades em dependências
         run: npm audit --audit-level=high
 
+      # A action oficial do gitleaks exige licença paga quando o repositório pertence
+      # a uma organização; o binário é MIT e sem restrição. Usar o binário mantém o
+      # gate executando de verdade em vez de ficar desligado por questão de licença.
       - name: Segredos versionados
-        uses: gitleaks/gitleaks-action@v2
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_VERSION: 8.30.1
+        run: |
+          curl -sSLf "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            | tar -xz -C /usr/local/bin gitleaks
+          # Varre o histórico completo (daí o fetch-depth: 0 acima): um segredo
+          # removido em commit posterior continua recuperável e continua vazado.
+          gitleaks git --no-banner --redact --exit-code 1 .
 
   container:
     name: Gate 9 — imagem Distroless e Trivy
@@ -150,19 +158,21 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      # Antes do Trivy, de propósito. Esta asserção verifica uma invariante NOSSA
+      # (ADR-001 exige nonroot); o Trivy verifica a higiene da base, que é de terceiro.
+      # Com a ordem invertida, uma CVE na base aborta o job e esconde se o nosso
+      # próprio requisito foi cumprido — foi o que aconteceu na primeira execução real.
+      - name: Conferir que a imagem roda sem privilégio
+        run: |
+          usuario=$(docker inspect --format '{{.Config.User}}' ifix-api:${{ github.sha }})
+          echo "usuário da imagem: ${usuario}"
+          [ "${usuario}" = "nonroot:nonroot" ] || { echo "esperado nonroot:nonroot"; exit 1; }
+
       - name: Trivy — bloqueia CVSS ≥ 7.0
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ifix-api:${{ github.sha }}
           format: table
           exit-code: "1"
           ignore-unfixed: true
           severity: HIGH,CRITICAL
-
-      - name: Conferir que a imagem roda sem privilégio
-        # O ADR-001 exige nonroot. Verificar aqui evita descobrir em produção que a
-        # imagem subiu como root por um COPY que trocou o dono.
-        run: |
-          usuario=$(docker inspect --format '{{.Config.User}}' ifix-api:${{ github.sha }})
-          echo "usuário da imagem: ${usuario}"
-          [ "${usuario}" = "nonroot:nonroot" ] || { echo "esperado nonroot:nonroot"; exit 1; }

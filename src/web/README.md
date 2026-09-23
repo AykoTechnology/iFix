@@ -8,7 +8,7 @@ Frontend React 19 + Tailwind CSS, consumindo `/design-system/tokens.json` como f
 
 1. Gerar `tailwind.config.ts` a partir de `/design-system/tokens.json`.
 2. Subir Storybook com `@storybook/addon-a11y` (Axe-core obrigatório por história, ADR-005).
-3. Configurar cliente HTTP gerado a partir do OpenAPI publicado pela API (ADR-009) — não escrever chamadas fetch manuais para rotas já contratadas.
+3. Configurar cliente HTTP gerado a partir do OpenAPI publicado pela API (ADR-009) — não escrever chamadas fetch manuais para rotas já contratadas. O contrato já existe em `docs/api/openapi.json`, versionado e verificado contra drift pelo gate 6.
 
 ## Telas de referência
 

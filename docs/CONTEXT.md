@@ -43,7 +43,7 @@ Plataforma cloud-native de **ESM/ITSM** (Enterprise & IT Service Management), mu
 | 5 verificação de RLS            | ativo        | por teste estrutural, vale para toda tabela futura                                   |
 | 6 drift de OpenAPI              | ativo        |                                                                                      |
 | 7 acessibilidade                | **pendente** | aguarda o Storybook                                                                  |
-| 8 SAST, dependências e segredos | **parcial**  | `npm audit` e Gitleaks ativos; CodeQL bloqueado — ver nota abaixo                    |
+| 8 SAST, dependências e segredos | ativo        | CodeQL, `npm audit` e Gitleaks — os três executando; ver nota abaixo                 |
 | 9 imagem e Trivy                | ativo        | imagem construída e varrida no CI; base em `nodejs22-debian13` — ver ressalva abaixo |
 | 10 auditoria de design tokens   | **pendente** | aguarda o pipeline do Style Dictionary                                               |
 | 11 validação de charts          | **pendente** | aguarda os charts terem conteúdo                                                     |
@@ -53,9 +53,11 @@ Gates pendentes **não** têm etapa correspondente na esteira. Adicionar um pass
 
 ### CodeQL depende de GitHub Advanced Security
 
-O workflow `codeql.yml` está correto, mas não executa: o repositório é privado numa organização sem **GitHub Advanced Security**, e a varredura de código exige esse licenciamento. O erro é `Advanced Security must be enabled for this repository to use code scanning`.
+Registrado porque a dependência não é óbvia pelo workflow e voltará a morder se o licenciamento mudar: `codeql.yml` estava correto e ainda assim não executava, porque o repositório é privado numa organização e a varredura de código exige **GitHub Advanced Security**. O erro era `Advanced Security must be enabled for this repository to use code scanning`.
 
-A decisão foi **habilitar o GHAS**, o que preserva o CodeQL, a aba Security e o histórico de alertas. Enquanto a habilitação não ocorrer — é ação de administrador da organização —, o check permanece vermelho e a parte SAST do gate 8 está **inativa**. O workflow não foi marcado como `continue-on-error` de propósito: um gate que nunca reprova é indistinguível de gate nenhum, e a tabela acima registra a lacuna em vez de escondê-la.
+O GHAS foi habilitado e o CodeQL passou a rodar — a parte SAST do gate 8 está ativa. Se o licenciamento for removido, o check volta a falhar por configuração, não por achado; a distinção está no log, não no ícone.
+
+O workflow não é `continue-on-error` de propósito: um gate que nunca reprova é indistinguível de gate nenhum. Enquanto a varredura estava bloqueada, a lacuna ficou registrada nesta tabela em vez de mascarada na esteira.
 
 ### Ressalva sobre o Dockerfile
 

@@ -1,4 +1,17 @@
 {
   "files": [],
-  "references": [{ "path": "./src/shared" }, { "path": "./src/api" }]
+  "references": [
+    {
+      "path": "./src/shared"
+    },
+    {
+      "path": "./src/api"
+    },
+    {
+      "path": "./src/workers"
+    },
+    {
+      "path": "./src/web"
+    }
+  ]
 }

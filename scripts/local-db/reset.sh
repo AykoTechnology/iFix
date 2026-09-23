@@ -35,6 +35,9 @@ psql_super -d postgres -c \
 psql_super -d postgres -c "drop database if exists ${DB}"
 psql_super -d postgres -c "create database ${DB}"
 
+echo "→ garantindo a extensão pgmq"
+PGHOST="${PGHOST}" PGSUPERUSER="${PGUSER}" "${ROOT}/scripts/local-db/install-pgmq.sh"
+
 echo "→ bootstrap de papéis e extensões"
 psql_super -d "${DB}" -f "${ROOT}/scripts/local-db/bootstrap.sql"
 

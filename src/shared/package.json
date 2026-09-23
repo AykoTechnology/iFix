@@ -16,5 +16,8 @@
   },
   "dependencies": {
     "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.15.5"
   }
 }

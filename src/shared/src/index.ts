@@ -6,3 +6,5 @@ export {
   type JwtClaims,
   type RequestContext,
 } from "./tenancy.js";
+
+export { withRequestContext } from "./db-context.js";

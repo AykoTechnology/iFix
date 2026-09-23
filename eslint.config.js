@@ -8,7 +8,15 @@ import tseslint from "typescript-eslint";
  * que depende de o revisor lembrar não é contrato, é intenção.
  */
 export default tseslint.config(
-  { ignores: ["**/dist/**", "**/node_modules/**", "**/coverage/**", "design-system/dist/**"] },
+  {
+    ignores: [
+      "**/dist/**",
+      "**/node_modules/**",
+      "**/coverage/**",
+      // Saída do `storybook build`: artefato, não fonte.
+      "storybook-static/**",
+    ],
+  },
 
   js.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
@@ -24,6 +32,11 @@ export default tseslint.config(
             "eslint.config.js",
             "vitest.config.ts",
             "scripts/check-design-literals.d.mts",
+            // Configuração do Storybook e do Tailwind: não pertencem a nenhum
+            // tsconfig de pacote, pelo mesmo motivo dos demais arquivos acima.
+            ".storybook/main.ts",
+            ".storybook/preview.ts",
+            "src/web/tailwind.config.ts",
           ],
         },
         tsconfigRootDir: import.meta.dirname,

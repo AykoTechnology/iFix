@@ -4,7 +4,11 @@
     "noEmit": true,
     "composite": false,
     "types": ["node"],
-    "paths": { "@ifix/shared": ["../src/shared/src/index.ts"] }
+    "paths": {
+      "@ifix/shared": ["../src/shared/src/index.ts"]
+    },
+    "jsx": "react-jsx",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"]
   },
-  "include": ["**/*.ts"]
+  "include": ["**/*.ts", "**/*.tsx"]
 }

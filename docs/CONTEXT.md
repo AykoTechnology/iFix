@@ -29,6 +29,8 @@ Plataforma cloud-native de **ESM/ITSM** (Enterprise & IT Service Management), mu
 | **Contexto transacional**       | `withRequestContext` aplica claims com `SET LOCAL`, de modo que morram no commit e não vazem para a próxima requisição da mesma conexão de pool       |
 | **Contrato OpenAPI**            | `docs/api/openapi.json` derivado dos schemas Zod, com gate 6 verificando drift                                                                        |
 | **Design tokens**               | `design-system/build.mjs` compila `tokens.json` em `dist/tokens.css` e `dist/tailwind-theme.js` (Style Dictionary v4, ADR-011)                        |
+| **Interface**                   | Storybook com `addon-a11y`, primeiro componente consumindo os tokens compilados (ADR-005, ADR-011)                                                    |
+| **Fila assíncrona**             | `notifications` em pgmq, publicação transacional por `app.publish_event`, consumidor idempotente com DLQ (ADR-002)                                    |
 | **Empacotamento**               | `Dockerfile` multi-estágio para Distroless, `nonroot`, sem devDependencies nem fontes TS na imagem final                                              |
 | **Esteira de CI**               | `.github/workflows/` com os gates 1, 2, 3, 4, 5, 6, 8, 9 e 12 ativos                                                                                  |
 | **Graceful shutdown**           | Provado contra o artefato **compilado**: SIGTERM e SIGINT saem com código 0, drenam e registram no log (Regra de Ouro 8)                              |
@@ -43,7 +45,7 @@ Plataforma cloud-native de **ESM/ITSM** (Enterprise & IT Service Management), mu
 | 4 integração                    | ativo        | PostgreSQL real em service container                                                 |
 | 5 verificação de RLS            | ativo        | por teste estrutural, vale para toda tabela futura                                   |
 | 6 drift de OpenAPI              | ativo        |                                                                                      |
-| 7 acessibilidade                | **pendente** | aguarda o Storybook                                                                  |
+| 7 acessibilidade                | ativo        | Axe por história do Storybook; ver nota sobre o limite do jsdom                      |
 | 8 SAST, dependências e segredos | ativo        | CodeQL, `npm audit` e Gitleaks — os três executando; ver nota abaixo                 |
 | 9 imagem e Trivy                | ativo        | imagem construída e varrida no CI; base em `nodejs22-debian13` — ver ressalva abaixo |
 | 10 auditoria de design tokens   | ativo        | drift dos artefatos + literais estéticos; ver nota abaixo                            |
@@ -65,6 +67,16 @@ O workflow não é `continue-on-error` de propósito: um gate que nunca reprova 
 `tests/design-tokens.test.ts` mede cada par texto/superfície nos **dois** temas (história 11.4). Os limiares numéricos vêm da WCAG, não do `tokens.json`: o arquivo escolhe o nível (`2.2 AA`) e o teste fixa os números daquele nível. A verificação por mutação mostrou por que — com os números vindos do arquivo, baixar `contrastNormalText` para 3 deixava a suíte verde sem corrigir nada.
 
 A primeira execução reprovou 29 casos e corrigiu um defeito estrutural: `status.*` e `domain.*` eram tokens de tema escuro disfarçados de globais. Hoje declaram `text` e `dot` por tema. Ver a entrada de 2026-09-23 em `docs/PLAYBOOKS/INCIDENTS_LEARNING.md`.
+
+### O que o gate 7 cobre, e o que não cobre
+
+`tests/a11y.test.tsx` roda o Axe sobre **cada história** do Storybook — o mesmo arquivo que documenta o componente é o que o testa, então a vitrine não pode divergir do que foi verificado.
+
+O Axe roda em jsdom, que não faz layout nem resolve `var()`. As regras que dependem de pixels renderizados — `color-contrast` acima de todas — ficam inertes e estão **explicitamente desabilitadas**, em vez de passarem por vacuidade. O contraste é verificado em `tests/design-tokens.test.ts`, por cálculo direto sobre os tokens nos dois temas: uma garantia mais forte, porque cobre todas as combinações declaradas e não apenas as que alguma história por acaso renderizou.
+
+O que sobra para o Axe é o que ele faz bem e o cálculo não alcança: estrutura, papéis ARIA, nomes acessíveis, rótulos e ordem de cabeçalhos. E o que nenhum dos dois detecta — cor como único portador de informação (História 11.7) — tem teste próprio no mesmo arquivo.
+
+O job da esteira também constrói a vitrine: uma história que deixasse de compilar sairia da suíte em silêncio, e o gate passaria por ter menos o que verificar.
 
 ### O gate 10 tem duas metades
 
@@ -90,11 +102,9 @@ trivy image --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed gcr.io/dis
 
 ### Próximos passos imediatos (Fase 0)
 
-1. **Pipeline do Style Dictionary** gerando `src/web/tailwind.config.ts` a partir de `/design-system/tokens.json` (ADR-011) — destrava o gate 10.
-2. **Storybook** com `@storybook/addon-a11y` **antes do primeiro componente** — destrava o gate 7 e é o que torna o ADR-005 efetivo.
-3. **Fila `pgmq`** com um consumidor idempotente, para fechar o marco de saída, que exige trace atravessando a fila.
-4. **Helm charts** com `securityContext`, as três probes e `terminationGracePeriodSeconds: 30` — destrava o gate 11.
-5. **OpenTelemetry completo** (ADR-008): o `trace-id` já vira `reqId` do Fastify e chega à auditoria pela GUC `app.trace_id`; falta o SDK com exportador OTLP — **bloqueado pelo R6**, que define o destino.
+1. **Storybook** com `@storybook/addon-a11y` **antes do primeiro componente** — destrava o gate 7 e é o que torna o ADR-005 efetivo.
+2. **Helm charts** com `securityContext`, as três probes e `terminationGracePeriodSeconds: 30` — destrava o gate 11.
+3. **OpenTelemetry completo** (ADR-008): o `trace-id` já vira `reqId` do Fastify e chega à auditoria pela GUC `app.trace_id`; falta o SDK com exportador OTLP — **bloqueado pelo R6**, que define o destino.
 
 **Marco de saída da Fase 0:** um endpoint em produção com RLS ativa, auditoria disparando, trace atravessando a fila e token de UI aplicado — ponta a ponta.
 
@@ -121,11 +131,16 @@ Onde houver Docker, o alvo é Testcontainers (ADR-018). O `reset.sh` entrega a m
 
 ## 3. Mapa de filas (`pgmq`) — vivo
 
-**Nenhuma fila foi criada ainda.** As filas previstas estão na § 5.3 da especificação. Esta seção passa a listar o estado **real** a partir do primeiro worker implementado, com: nome, produtor, consumidor, chave de idempotência e estado da DLQ.
+Estado **real**, não previsto. As filas planejadas estão na § 5.3 da especificação.
 
-| Fila | Produtor | Consumidor | Idempotência | Status               |
-| ---- | -------- | ---------- | ------------ | -------------------- |
-| —    | —        | —          | —            | nenhuma implementada |
+| Fila                | Produtor                          | Consumidor                 | Idempotência                        | DLQ                 |
+| ------------------- | --------------------------------- | -------------------------- | ----------------------------------- | ------------------- |
+| `notifications`     | `app.publish_event`               | `@ifix/workers` (consumer) | `(tenant_id, queue_name, event_id)` | `notifications_dlq` |
+| `notifications_dlq` | consumidor, ao esgotar tentativas | — (investigação manual)    | —                                   | —                   |
+
+**Nome:** a § 5.3 lista a fila como `pgmq_notifications`. O próprio pgmq prefixa a tabela com `q_`, então o prefixo `pgmq_` produziria `pgmq.q_pgmq_notifications`. A fila se chama `notifications`; o prefixo na especificação indica a tecnologia, não o nome.
+
+**Versão do pgmq:** `v1.13.0`, a mesma em `scripts/local-db/install-pgmq.sh` e na imagem `ghcr.io/pgmq/pg16-pgmq:v1.13.0` usada pela esteira. O pgmq é extensão de SQL puro — sem código C ou Rust —, então `make install` roda sem compilador.
 
 ## 4. Mapa de tabelas core — vivo
 

@@ -48,10 +48,12 @@ As 11 Regras de Ouro, cada uma com o gate de CI que a torna mecânica, estão na
 - **Banco**: migração de fundação com o padrão de referência de RLS nos dois eixos, auditoria por trigger imutável e `uuid_generate_v7()`.
 - **API**: servidor Fastify com contexto de requisição aplicado por GUC transacional, três probes distintas e contrato OpenAPI 3.1 derivado do Zod.
 - **Design**: `tokens.json` compilado por Style Dictionary em variáveis CSS e tema do Tailwind, com gate de drift e de literal estético.
-- **Esteira**: 10 dos 12 gates da § 6.4 ativos; imagem Distroless `nonroot` com varredura Trivy.
+- **Fila**: `notifications` em pgmq com publicação transacional e consumidor idempotente com DLQ.
+- **Interface**: Storybook com Axe por história; primeiro componente consumindo os tokens.
+- **Esteira**: 11 dos 12 gates da § 6.4 ativos; imagem Distroless `nonroot` com varredura Trivy.
 - **Testes**: 63 testes contra PostgreSQL real, incluindo testes estruturais que reprovam qualquer tabela sem RLS forçada.
 
-Pendentes da fase: Storybook com addon-a11y (gate 7), Helm charts (gate 11), fila `pgmq` com consumidor idempotente e SDK OpenTelemetry. Ver `docs/CONTEXT.md` § 1.
+Pendentes da fase: Helm charts (gate 11) e SDK OpenTelemetry — este bloqueado pelo **R6**, que define o destino de exportação. Ver `docs/CONTEXT.md` § 1.
 
 ## Governança de documentação
 

@@ -69,3 +69,17 @@ Toda entrada nova é adicionada ao **topo** da lista (mais recente primeiro). Ne
   2. **A tag da base permanece flutuante.** Fixar por digest congelaria a imagem na versão vulnerável; a reconstrução periódica a montante é o mecanismo que mantém as correções chegando.
   3. **Num mesmo job, verificação de invariante nossa vem antes de varredura de terceiro.**
 - **Referência**: PR #23, `Dockerfile`, `.github/workflows/ci.yml`, ADR-001.
+
+### 2026-09-23 — O tema claro nunca havia sido validado, e o validador era circular
+
+- **Sintoma**: a primeira execução do teste de contraste sobre `tokens.json` reprovou **29 casos**. Não era regressão: era a primeira vez que alguém mediu.
+- **Causa-raiz**: o design system foi entregue com dois temas, mas construído para um. O `$description` do grupo `status` dizia literalmente _"texto claro sobre fundo translúcido"_ — a suposição de tema escuro estava escrita no próprio token. Os rótulos de status e de domínio iam de 5,89:1 a 11,74:1 no escuro e de **1,15:1 a 2,40:1** no claro. Somavam-se a isso `text-muted` reprovando nos dois temas, `text-secondary`/`text-tertiary` a 4,30:1 no claro e `border-interactive` a 1,64:1 contra os 3:1 da WCAG 1.4.11.
+- **Por que passou despercebido**: um tema sem uso ainda não tinha tela para revelar o problema, e nenhuma verificação media cor. O ADR-011 exigia contraste "testado e validado na fonte" desde o início — era uma intenção documentada, sem mecanismo. A história 11.4 antecipava exatamente isso: _"validar apenas o escuro deixaria metade da interface sem garantia"_.
+- **Mitigação aplicada**: `status.*` e `domain.*` passaram a declarar `text` e `dot` por tema, na mesma forma de `color.theme`; a rampa de texto do tema claro foi refeita como três degraus que preservam a hierarquia visual e cruzam 4,5:1 na pior superfície; as bordas interativas subiram para 3:1; e `accent`, que só existia no tema claro, ganhou par no escuro.
+- **Achado dentro do achado — o validador era circular**: a verificação por mutação mostrou que baixar `contrastNormalText` de 4.5 para 3 **no próprio `tokens.json`** deixava a suíte inteira verde. O teste lia o limiar do arquivo que validava. O arquivo passou a escolher apenas o **nível** (`2.2 AA`); os **números** de cada nível são fixados pela norma dentro do teste. Remover um tema de `themesToValidate` também reprova agora.
+- **Segundo achado — detecção de tema por nome**: o compilador identificava o eixo de tema pelo nome do segmento, e `font.weight.light` colidiu com o tema `light`. Um peso de fonte teria sido emitido dentro do seletor de tema, em silêncio. A detecção passou a ser estrutural: só é eixo de tema o grupo cujos filhos são exatamente os temas declarados.
+- **Regras novas**:
+  1. **Teste que lê o critério do artefato que valida não é teste.** O artefato escolhe o nível; a norma externa fixa os números. Vale para contraste, cobertura e qualquer limiar.
+  2. **Eixo de variação se detecta por estrutura, não por nome.** Nome colide — e a colisão é silenciosa.
+  3. **Todo grupo bifurcado por tema declara todos os temas**, verificado por varredura da árvore, não só em `color.theme`.
+- **Referência**: `design-system/tokens.json` v1.2.0, `design-system/build.mjs`, `tests/design-tokens.test.ts`, ADR-005, ADR-011.

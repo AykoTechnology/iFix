@@ -28,13 +28,54 @@ const DESTINO = resolve(AQUI, "dist");
 
 const conferir = process.argv.includes("--check");
 
-/** Papéis de `color.theme.<tema>` viram `--color-<papel>`, resolvidos por tema. */
-const GRUPO_TEMA = ["color", "theme"];
+/**
+ * Tokens resolvidos por tema.
+ *
+ * O eixo de tema aparece em duas posições no arquivo, e ambas são legítimas:
+ *
+ *   color.theme.dark.surface        superfícies e papéis de texto do tema
+ *   color.status.novo.text.dark     um papel que existe fora do tema, mas varia com ele
+ *
+ * A regra é uma só: o segmento igual a um tema declarado marca o token como
+ * resolvido por tema, e some do nome — assim como o segmento literal `theme`, que é
+ * andaime de organização. O que sobra é o nome semântico que o componente consome.
+ * `--color-surface` e `--color-status-novo-text` resolvem no tema ativo sem que o
+ * componente saiba qual é.
+ */
+const ARVORE = JSON.parse(readFileSync(ORIGEM, "utf8"));
+const TEMAS = ARVORE.$extensions["com.ifix.validation"].themesToValidate;
 
-const ehTokenDeTema = (path) =>
-  path.length === GRUPO_TEMA.length + 2 && GRUPO_TEMA.every((seg, i) => path[i] === seg);
+const filhos = (no) => Object.keys(no ?? {}).filter((k) => !k.startsWith("$"));
 
-const nomeCss = (path) => `--${path.join("-")}`;
+/**
+ * Um segmento só é eixo de tema quando os irmãos dele são exatamente os temas
+ * declarados. A verificação é estrutural, não por nome — `font.weight.light` existe
+ * e não tem nada a ver com o tema claro. Decidir pelo nome quebraria esse token em
+ * silêncio, emitindo um peso de fonte dentro do seletor de tema.
+ */
+function eixoDeTema(path) {
+  let no = ARVORE;
+  for (let i = 0; i < path.length; i++) {
+    if (TEMAS.includes(path[i])) {
+      const irmaos = filhos(no);
+      if (irmaos.length === TEMAS.length && TEMAS.every((t) => irmaos.includes(t))) return i;
+    }
+    no = no?.[path[i]];
+  }
+  return -1;
+}
+
+const temaDoToken = (path) => {
+  const i = eixoDeTema(path);
+  return i === -1 ? undefined : path[i];
+};
+
+const nomeSemantico = (path) => {
+  const i = eixoDeTema(path);
+  return path.filter((seg, j) => j !== i && seg !== "theme").join("-");
+};
+
+const nomeCss = (path) => `--${nomeSemantico(path)}`;
 
 /**
  * Serializa um `$value` do DTCG para CSS.
@@ -96,14 +137,28 @@ StyleDictionary.registerFormat({
     const porTema = new Map();
 
     for (const token of dictionary.allTokens) {
-      if (ehTokenDeTema(token.path)) {
-        const tema = token.path[2];
-        const papel = token.path[3];
-        if (!porTema.has(tema)) porTema.set(tema, []);
-        porTema.get(tema).push(`  --color-${papel}: ${valorCss(token)};`);
-      } else {
+      const tema = temaDoToken(token.path);
+      if (tema === undefined) {
         globais.push(`  ${nomeCss(token.path)}: ${valorCss(token)};`);
+        continue;
       }
+      if (!porTema.has(tema)) porTema.set(tema, []);
+      porTema.get(tema).push(`  ${nomeCss(token.path)}: ${valorCss(token)};`);
+    }
+
+    // Um papel declarado em um tema e ausente no outro produziria variável que
+    // resolve num tema e fica indefinida no outro — drift silencioso. O compilador
+    // recusa em vez de emitir o CSS quebrado.
+    const nomesPorTema = [...porTema].map(([tema, linhas]) => [
+      tema,
+      new Set(linhas.map((l) => l.trim().split(":")[0])),
+    ]);
+    const universo = new Set(nomesPorTema.flatMap(([, nomes]) => [...nomes]));
+    const ausentes = nomesPorTema.flatMap(([tema, nomes]) =>
+      [...universo].filter((n) => !nomes.has(n)).map((n) => `${tema}: ${n}`),
+    );
+    if (ausentes.length > 0) {
+      throw new Error(`papel sem par entre temas:\n  ${ausentes.join("\n  ")}`);
     }
 
     const temas = [...porTema.keys()];
@@ -154,14 +209,16 @@ StyleDictionary.registerFormat({
     const papeisDeTema = new Set();
 
     for (const token of dictionary.allTokens) {
-      const [raiz, ...resto] = token.path;
-      const ref = `var(${ehTokenDeTema(token.path) ? `--color-${token.path[3]}` : nomeCss(token.path)})`;
+      const semantico = nomeSemantico(token.path);
+      const ref = `var(--${semantico})`;
 
-      if (ehTokenDeTema(token.path)) {
-        papeisDeTema.add(token.path[3]);
+      if (temaDoToken(token.path) !== undefined) {
+        // Um papel por tema entra uma única vez: são N valores e um só nome.
+        papeisDeTema.add(semantico);
         continue;
       }
 
+      const [raiz, ...resto] = token.path;
       switch (raiz) {
         case "color":
           secoes.colors[resto.join("-")] = ref;
@@ -195,10 +252,11 @@ StyleDictionary.registerFormat({
       }
     }
 
-    // Papéis de tema entram sem prefixo: `bg-surface`, `text-text-primary`. São eles
-    // que os componentes devem usar — a paleta bruta existe para compor tokens novos.
+    // Papéis de tema entram pelo nome semântico: `bg-surface`, `text-status-novo-text`.
+    // São eles que os componentes devem usar — a paleta bruta existe para compor
+    // tokens novos, não para ser consumida direto.
     for (const papel of [...papeisDeTema].sort()) {
-      secoes.colors[papel] = `var(--color-${papel})`;
+      secoes.colors[papel.replace(/^color-/, "")] = `var(--${papel})`;
     }
 
     return [

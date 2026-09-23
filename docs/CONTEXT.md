@@ -60,6 +60,12 @@ O GHAS foi habilitado e o CodeQL passou a rodar — a parte SAST do gate 8 está
 
 O workflow não é `continue-on-error` de propósito: um gate que nunca reprova é indistinguível de gate nenhum. Enquanto a varredura estava bloqueada, a lacuna ficou registrada nesta tabela em vez de mascarada na esteira.
 
+### Conformidade de contraste é verificada, não presumida
+
+`tests/design-tokens.test.ts` mede cada par texto/superfície nos **dois** temas (história 11.4). Os limiares numéricos vêm da WCAG, não do `tokens.json`: o arquivo escolhe o nível (`2.2 AA`) e o teste fixa os números daquele nível. A verificação por mutação mostrou por que — com os números vindos do arquivo, baixar `contrastNormalText` para 3 deixava a suíte verde sem corrigir nada.
+
+A primeira execução reprovou 29 casos e corrigiu um defeito estrutural: `status.*` e `domain.*` eram tokens de tema escuro disfarçados de globais. Hoje declaram `text` e `dot` por tema. Ver a entrada de 2026-09-23 em `docs/PLAYBOOKS/INCIDENTS_LEARNING.md`.
+
 ### O gate 10 tem duas metades
 
 A primeira é **drift**: `npm run tokens:check` recompila `tokens.json` e compara com o que está versionado em `design-system/dist/`. Mesmo mecanismo do gate 6 — o artefato nunca é editado à mão, e divergir reprova.

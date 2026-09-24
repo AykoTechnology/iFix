@@ -21,8 +21,8 @@ replicaCount: 1
 probePort: 3001
 
 probes:
-  # Os três caminhos batem com `src/workers/src/probes.ts` — o mesmo contrato
-  # de `@ifix/shared` que a API usa, ver ADR e comentário em charts/api.
+  # Os três caminhos precisam bater com as rotas de `src/workers/src/probes.ts`;
+  # `tests/deploy-invariants.test.ts` compara os dois e reprova a divergência.
   liveness:
     path: /health/live
     initialDelaySeconds: 5
@@ -50,11 +50,16 @@ resources:
     # sob rajada é pior que o custo de um nó com capacidade ociosa reservada.
     memory: 256Mi
 
-# terminationGracePeriodSeconds: 30 é a Regra de Ouro 8 e não é exposto como
-# valor — ver a mesma justificativa do securityContext acima. O
-# SHUTDOWN_TIMEOUT_MS de 25s do processo (src/workers/src/config.ts) fica
-# deliberadamente abaixo, para terminar de drenar o lote ANTES do SIGKILL.
-preStopSleepSeconds: 5
+# Orçamento de encerramento (Regra de Ouro 8): shutdownTimeoutMs + margem (≥ 2s) ≤ 30s,
+# verificado pelo gate 11 e injetado como SHUTDOWN_TIMEOUT_MS no contêiner.
+#
+# Sem preStop, de propósito. No chart do api o preStop existe para o endpoint sair do
+# Service antes do SIGTERM — tráfego EMPURRADO para o pod. O worker PUXA trabalho da
+# fila: nada roteia para ele, então não há o que esperar sair. Pior, durante a pausa
+# o processo ainda não recebeu SIGTERM e segue puxando lotes novos, comendo o prazo
+# de drenagem. O SIGTERM direto já faz a coisa certa: o laço para de ler a fila e só
+# termina o lote corrente (`src/workers/src/index.ts`).
+shutdownTimeoutMs: 25000
 
 # Autoscaling por comprimento de fila (KEDA), não HPA de CPU/memória: o custo
 # de processar uma notificação não escala com o tráfego HTTP de ninguém, e sim
@@ -77,9 +82,10 @@ keda:
   # HPA por baixo do KEDA calcula réplicas como teto(métrica / este valor).
   targetQueryValue: 5
   query: "select count(*) from pgmq.q_notifications where vt <= now()"
-  # "disable" é o padrão de desenvolvimento local; ambientes gerenciados
-  # (Supabase, RDS) exigem "require" — sobrescrever por values-<ambiente>.yaml.
-  sslmode: disable
+  # "require" por padrão: um chart existe para rodar em cluster, e o padrão inseguro
+  # seria o que sobra quando alguém esquece de sobrescrever. Só um Postgres local sem
+  # TLS justifica "disable", e isso vai num values de desenvolvimento, explicitamente.
+  sslmode: require
 
 podDisruptionBudget:
   enabled: false

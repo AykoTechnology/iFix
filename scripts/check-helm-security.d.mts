@@ -7,6 +7,7 @@
  */
 
 export interface ViolacaoDeSeguranca {
+  /** Nome do workload (ou do chart, para `nenhum-workload`). */
   deployment: string;
   /** Nome do contêiner, quando a violação é por contêiner e não por pod. */
   contêiner?: string;
@@ -17,4 +18,7 @@ export interface ViolacaoDeSeguranca {
 /** Manifesto Kubernetes decodificado de YAML — deliberadamente não tipado a fundo. */
 export type Manifesto = Record<string, unknown>;
 
+export declare const MARGEM_DE_ENCERRAMENTO_MS: number;
+export declare const WORKLOADS: ReadonlySet<string>;
 export declare function analisar(manifestos: readonly Manifesto[]): ViolacaoDeSeguranca[];
+export declare function contarWorkloads(manifestos: readonly Manifesto[]): number;

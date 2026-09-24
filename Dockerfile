@@ -9,9 +9,10 @@
 # Dois serviços, um Dockerfile: `api` e `workers` compartilham o mesmo `build`/`deps`
 # e divergem só no estágio de execução — um Dockerfile por serviço duplicaria a lógica
 # de empacotamento e os dois se afastariam silenciosamente a cada mudança em um deles.
-# `docker build --target runtime-api` ou `--target runtime-workers` escolhe qual sobe;
-# sem `--target`, o padrão é o último estágio do arquivo (`runtime-api`), preservando o
-# comportamento de quem já construía a imagem sem essa flag.
+# `docker build --target runtime-api` ou `--target runtime-workers` escolhe qual sobe.
+# Sem `--target`, o Docker constrói o ÚLTIMO estágio do arquivo — por isso `runtime-api`
+# fica por último, de propósito: quem já rodava `docker build -t ifix-api .` continua
+# recebendo a API, e não o worker com o nome errado. Não reordene os estágios finais.
 
 # ---------------------------------------------------------------------------
 # Estágio 1 — compilação
@@ -80,7 +81,20 @@ COPY --from=build /app/src/shared/dist         ./src/shared/dist
 USER nonroot:nonroot
 
 # ---------------------------------------------------------------------------
-# Estágio 4a — execução: api
+# Estágio 4a — execução: workers
+# ---------------------------------------------------------------------------
+FROM runtime-base AS runtime-workers
+COPY --from=build /app/src/workers/package.json ./src/workers/
+COPY --from=build /app/src/workers/dist         ./src/workers/dist
+
+# As três probes do worker (`src/workers/src/probes.ts`), não uma porta HTTP de
+# negócio — o worker não serve rota alguma ao usuário final.
+EXPOSE 3001
+
+CMD ["src/workers/dist/index.js"]
+
+# ---------------------------------------------------------------------------
+# Estágio 4b — execução: api
 # ---------------------------------------------------------------------------
 FROM runtime-base AS runtime-api
 COPY --from=build /app/src/api/package.json ./src/api/
@@ -92,16 +106,3 @@ EXPOSE 3000
 # PID 1 e recebe SIGTERM diretamente, sem supervisor intermediário. É o que torna o
 # graceful shutdown do `src/api/src/index.ts` efetivo (Regra de Ouro 8).
 CMD ["src/api/dist/index.js"]
-
-# ---------------------------------------------------------------------------
-# Estágio 4b — execução: workers
-# ---------------------------------------------------------------------------
-FROM runtime-base AS runtime-workers
-COPY --from=build /app/src/workers/package.json ./src/workers/
-COPY --from=build /app/src/workers/dist         ./src/workers/dist
-
-# As três probes do worker (`src/workers/src/probes.ts`), não uma porta HTTP de
-# negócio — o worker não serve rota alguma ao usuário final.
-EXPOSE 3001
-
-CMD ["src/workers/dist/index.js"]

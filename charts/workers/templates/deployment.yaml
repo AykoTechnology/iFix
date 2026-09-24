@@ -37,8 +37,7 @@ spec:
         seccompProfile:
           type: RuntimeDefault
 
-      # Regra de Ouro 8 — mesma justificativa do chart do api:
-      # SHUTDOWN_TIMEOUT_MS (25s) fica abaixo deste valor de propósito.
+      # Regra de Ouro 8 — ver o orçamento de encerramento em values.yaml.
       terminationGracePeriodSeconds: 30
 
       containers:
@@ -64,6 +63,8 @@ spec:
               value: "0.0.0.0"
             - name: PROBE_PORT
               value: {{ .Values.probePort | quote }}
+            - name: SHUTDOWN_TIMEOUT_MS
+              value: {{ .Values.shutdownTimeoutMs | quote }}
           {{- with .Values.extraEnv }}
             {{- toYaml . | nindent 12 }}
           {{- end }}
@@ -72,14 +73,8 @@ spec:
             {{- toYaml . | nindent 12 }}
           {{- end }}
 
-          # `lifecycle.preStop.sleep` — mesma justificativa do chart do api.
-          # Aqui não há endpoint de Service para drenar, mas o KEDA para de
-          # rotear trabalho novo para um pod marcado para saída antes do
-          # SIGTERM chegar, e a pausa dá essa margem.
-          lifecycle:
-            preStop:
-              sleep:
-                seconds: {{ .Values.preStopSleepSeconds }}
+          # Sem `lifecycle.preStop` — ver o comentário do orçamento de
+          # encerramento em values.yaml: worker puxa da fila, não recebe tráfego.
 
           startupProbe:
             httpGet:

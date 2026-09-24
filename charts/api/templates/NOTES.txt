@@ -7,9 +7,14 @@ Encaminhe a porta para testar localmente:
   kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "ifix-api.fullname" . }} {{ .Values.service.port }}:{{ .Values.service.port }}
   curl http://localhost:{{ .Values.service.port }}/health/ready
 
-Este chart não cria o Secret "{{ (index .Values.envFrom 0).secretRef.name }}" referenciado
-por envFrom — ele precisa existir no namespace antes da instalação (Épico 12.6: origem
-única de segredos, nunca gerada pelo chart).
+{{- range .Values.envFrom }}
+{{- with .secretRef }}
+
+Este chart não cria o Secret "{{ .name }}" referenciado por envFrom — ele precisa
+existir no namespace antes da instalação (Épico 12.6: origem única de segredos,
+nunca gerada pelo chart).
+{{- end }}
+{{- end }}
 {{- if .Values.autoscaling.enabled }}
 
 Autoscaling habilitado: {{ .Values.autoscaling.minReplicas }}–{{ .Values.autoscaling.maxReplicas }} réplicas

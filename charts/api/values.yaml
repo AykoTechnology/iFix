@@ -15,9 +15,9 @@ service:
   port: 3000
 
 probes:
-  # Os três caminhos batem com `src/api/src/server.ts` — mudar um lado sem o outro é
-  # exatamente o defeito que os testes de `tests/api-http.test.ts` já pegam no CI,
-  # mas só depois do deploy é que apareceria como pod nunca ficando Ready.
+  # Os três caminhos precisam bater com as rotas de `src/api/src/server.ts`. Mudar um
+  # lado sem o outro só apareceria depois do deploy, como pod que nunca fica Ready —
+  # por isso `tests/deploy-invariants.test.ts` compara os dois e reprova a divergência.
   liveness:
     path: /health/live
     initialDelaySeconds: 5
@@ -48,9 +48,19 @@ resources:
     # menos pode piorar. O HPA por CPU abaixo é o mecanismo de conter o uso agregado.
     memory: 256Mi
 
-# terminationGracePeriodSeconds: 30 é a Regra de Ouro 8 e não é exposto como valor —
-# ver a mesma justificativa do securityContext acima.
+# Orçamento de encerramento (Regra de Ouro 8). `terminationGracePeriodSeconds: 30` é
+# fixo no template, e o relógio dele começa ANTES do preStop — a documentação do
+# Kubernetes é explícita: "the Pod's termination grace period countdown begins before
+# the PreStop hook is executed". Logo o processo não tem 30s depois do SIGTERM, tem
+# 30 − preStopSleepSeconds. A conta precisa fechar com folga:
+#
+#   preStopSleepSeconds (5s) + shutdownTimeoutMs (20s) + margem (≥ 2s) ≤ 30s
+#
+# `scripts/check-helm-security.mjs` reprova o chart se a soma não fechar. O valor é
+# injetado como SHUTDOWN_TIMEOUT_MS no contêiner — o padrão de 25s do código
+# (`src/api/src/config.ts`) vale para rodar fora do cluster e, aqui, estouraria o prazo.
 preStopSleepSeconds: 5
+shutdownTimeoutMs: 20000
 
 autoscaling:
   enabled: true

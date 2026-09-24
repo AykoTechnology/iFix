@@ -40,9 +40,8 @@ spec:
           type: RuntimeDefault
 
       # `terminationGracePeriodSeconds: 30` é a Regra de Ouro 8 (não é valor
-      # configurável — ver values.yaml). `SHUTDOWN_TIMEOUT_MS` da aplicação é 25s,
-      # deliberadamente menor: o processo tem que terminar de drenar ANTES do
-      # SIGKILL, não no mesmo instante.
+      # configurável). O prazo INCLUI o preStop: ver a conta do orçamento de
+      # encerramento em values.yaml, verificada pelo gate 11.
       terminationGracePeriodSeconds: 30
 
       containers:
@@ -66,6 +65,8 @@ spec:
               value: "0.0.0.0"
             - name: PORT
               value: {{ .Values.service.port | quote }}
+            - name: SHUTDOWN_TIMEOUT_MS
+              value: {{ .Values.shutdownTimeoutMs | quote }}
           {{- with .Values.extraEnv }}
             {{- toYaml . | nindent 12 }}
           {{- end }}

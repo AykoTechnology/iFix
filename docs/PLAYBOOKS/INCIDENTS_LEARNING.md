@@ -18,6 +18,17 @@ Toda entrada nova é adicionada ao **topo** da lista (mais recente primeiro). Ne
 
 ---
 
+### 2026-09-24 — Doze gates ativos, nenhum bloqueando o merge
+
+- **Sintoma**: nenhum na esteira. Encontrado ao conferir as Issues contra o repositório: a história 11.5 exige "bloqueio de merge", e a `main` não tinha proteção de branch. Qualquer PR com o CI vermelho podia ser mergeado.
+- **Causa-raiz**: os gates foram construídos e verificados como **executáveis** — cada um reprova de verdade, provado por mutação. Mas "reprova" termina num ícone vermelho; o que transforma o vermelho em bloqueio é uma configuração do repositório, fora do código, que ninguém tinha ligado. A tabela de gates do `CONTEXT.md` dizia "ativo" e ninguém perguntou ativo **para quê**.
+- **Por que é grave além do incidente**: todas as garantias da § 6.4 — RLS, contraste, PSS, CVE — dependiam de alguém olhar o CI antes de clicar em merge. É o "gate que aprova por vacuidade" deste playbook no nível mais alto: não um gate, mas a esteira inteira.
+- **Mitigação aplicada**: ruleset na `main` exigindo PR, os 8 checks verdes, branch atualizado e conversas resolvidas, sem force push nem exclusão, sem lista de bypass.
+- **Regras novas**:
+  1. **Gate novo só está pronto quando é check obrigatório no ruleset**, não quando o job existe no `ci.yml`.
+  2. **Renomear um job exige atualizar o ruleset na mesma PR.** Check exigido que nunca é reportado trava toda PR.
+- **Referência**: Issue #27, história 11.5 (#11), `docs/CONTEXT.md` § 1.
+
 ### 2026-09-24 — A PSS em modo `enforce` não bloqueia um Deployment inseguro
 
 - **Sintoma**: nenhum — encontrado ao desenhar a verificação de admissão real do gate 11. Um Deployment com `runAsUser: 0` aplicado num namespace `pod-security.kubernetes.io/enforce=restricted` foi **aceito**.

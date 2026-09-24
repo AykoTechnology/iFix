@@ -282,9 +282,12 @@ jobs:
       # um kube-apiserver 1.30 (sem nós, sem Docker — a admissão da PSS roda dentro do
       # apiserver) e aplica os workloads com --dry-run=server num namespace
       # `restricted`. Ver scripts/check-helm-psa.mjs, inclusive o controle negativo.
+      # 1.26 porque o setup-envtest v0.25.1 exige go >= 1.26. Declarar menos faz o
+      # GOTOOLCHAIN=auto baixar outra toolchain em silêncio — o workflow deixaria de
+      # dizer com qual Go o gate realmente roda.
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.24"
+          go-version: "1.26"
           cache: false
 
       - name: Admissão real da PSS (kube-apiserver 1.30)

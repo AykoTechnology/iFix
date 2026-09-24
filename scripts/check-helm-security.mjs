@@ -26,8 +26,9 @@
  *
  * Reprova também o que não consegue olhar: Job/CronJob/Pod soltos e chart que
  * renderiza zero workloads. O que este script NÃO é: o controlador de admissão real da
- * PSS. É uma lista mantida à mão — a próxima etapa é validar contra um cluster `kind`
- * com o namespace em `pod-security.kubernetes.io/enforce=restricted`.
+ * PSS. É uma lista mantida à mão; a admissão real é verificada por
+ * `scripts/check-helm-psa.mjs`. Os dois se complementam: a PSS não conhece a Regra de
+ * Ouro 8 nem o uid 65532 da imagem, e esta lista não conhece tudo o que a PSS reprova.
  *
  * O uid/gid 65532 está fixo aqui, não configurável: é uma invariante do produto, não
  * do ambiente — mesma razão por trás de `values.yaml` não expor `securityContext` em
@@ -271,7 +272,7 @@ export function contarWorkloads(manifestos) {
 }
 
 /** Renderiza um chart com `helm template` e devolve os documentos decodificados. */
-function renderizar(caminhoDoChart) {
+export function renderizar(caminhoDoChart) {
   const saida = execFileSync("helm", ["template", caminhoDoChart, "--kube-version", "1.30.0"], {
     cwd: RAIZ,
     encoding: "utf8",
@@ -282,8 +283,11 @@ function renderizar(caminhoDoChart) {
   return [...loadAll(saida)].filter(Boolean);
 }
 
+/** Charts verificados pelo gate 11. `charts/infra` fica de fora enquanto for só README. */
+export const CHARTS = ["charts/api", "charts/workers"];
+
 async function principal() {
-  const charts = ["charts/api", "charts/workers"];
+  const charts = CHARTS;
   const violacoes = [];
   let total = 0;
 

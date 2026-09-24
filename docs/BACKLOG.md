@@ -19,6 +19,8 @@
 
 ## Épicos e Issues
 
+O trabalho transversal da Fase 0 (monorepo, esteira, RLS, API, empacotamento) é acompanhado na [#27](https://github.com/AykoTechnology/iFix/issues/27).
+
 | Épico | Título                                            | Issue                                                   |
 | ----- | ------------------------------------------------- | ------------------------------------------------------- |
 | 1     | Governança e Portabilidade de Configuração        | [#1](https://github.com/AykoTechnology/iFix/issues/1)   |

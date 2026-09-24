@@ -18,6 +18,17 @@ Toda entrada nova é adicionada ao **topo** da lista (mais recente primeiro). Ne
 
 ---
 
+### 2026-09-24 — A PSS em modo `enforce` não bloqueia um Deployment inseguro
+
+- **Sintoma**: nenhum — encontrado ao desenhar a verificação de admissão real do gate 11. Um Deployment com `runAsUser: 0` aplicado num namespace `pod-security.kubernetes.io/enforce=restricted` foi **aceito**.
+- **Causa-raiz**: o `enforce` da PodSecurity age sobre **Pods**, não sobre os objetos que os criam. Para um Deployment, o apiserver só emite um aviso ("would violate PodSecurity") e grava o objeto. Num cluster com nós, a rejeição aconteceria depois, quando o ReplicaSet tentasse criar o Pod — como evento `FailedCreate`, sem nada reprovar no `helm install`. Num apiserver sem nós, como o do gate, nem isso.
+- **Por que é grave além do incidente**: um gate montado com `enforce=restricted` + `kubectl apply` aprovaria qualquer chart. É o mesmo "gate que aprova por vacuidade" deste playbook, agora com a aparência de usar a ferramenta oficial.
+- **Mitigação aplicada**: o namespace do gate também recebe `warn=restricted`, e o `kubectl` roda com `--warnings-as-errors`, então o aviso vira reprovação. Toda execução aplica antes um Deployment deliberadamente inseguro, que **precisa** ser reprovado. Se passar, o gate falha por não conseguir provar nada. Verificado por mutação: pod sem seccomp, `capabilities.add`, e o namespace trocado para `privileged` (o controle negativo pega este último).
+- **Regras novas**:
+  1. **Admissão de PSS para workload se verifica por aviso, não por bloqueio.** Vale para qualquer checagem futura com a PSS — inclusive política de cluster em produção, que precisa de `warn`/`audit` para que o problema apareça antes do `FailedCreate`.
+  2. **Gate que depende de um mecanismo externo estar ligado carrega um controle negativo em toda execução**, não só no dia em que foi escrito.
+- **Referência**: `scripts/check-helm-psa.mjs`, `.github/workflows/ci.yml` (job `helm`), Issue #27.
+
 ### 2026-09-24 — CI 8/8 verde, e a PR ainda carregava três defeitos de severidade alta
 
 - **Sintoma**: nenhum na esteira. A PR #26 (charts Helm e gate 11) estava com todos os checks verdes e `mergeable: clean`. Uma revisão adversarial antes do merge — conferir cada afirmação escrita contra o que o código faz — encontrou três defeitos que nenhum gate via.

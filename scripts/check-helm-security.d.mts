@@ -22,3 +22,6 @@ export declare const MARGEM_DE_ENCERRAMENTO_MS: number;
 export declare const WORKLOADS: ReadonlySet<string>;
 export declare function analisar(manifestos: readonly Manifesto[]): ViolacaoDeSeguranca[];
 export declare function contarWorkloads(manifestos: readonly Manifesto[]): number;
+export declare const CHARTS: readonly string[];
+/** Renderiza um chart com `helm template` (exige o binário `helm`). */
+export declare function renderizar(caminhoDoChart: string): Manifesto[];

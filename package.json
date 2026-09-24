@@ -30,6 +30,7 @@
     "design:literals": "node scripts/check-design-literals.mjs",
     "helm:lint": "helm lint charts/api && helm lint charts/workers",
     "helm:security": "node scripts/check-helm-security.mjs",
+    "helm:psa": "node scripts/check-helm-psa.mjs",
     "storybook": "storybook dev -p 6006",
     "storybook:build": "storybook build"
   },

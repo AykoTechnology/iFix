@@ -418,6 +418,8 @@ A ordem reflete dependência técnica, não prioridade de negócio — a prioriz
 
 ### 5.3. Mapa de filas `pgmq`
 
+> **Nome lógico × nome real.** O prefixo `pgmq_` nesta tabela (e no ADR-010) indica a tecnologia, não faz parte do nome. O próprio pgmq cria a tabela como `pgmq.q_<nome>`, então `pgmq.create('pgmq_notifications')` produziria `pgmq.q_pgmq_notifications`. A fila real se chama sem o prefixo — `notifications`, tabela `pgmq.q_notifications` — e assim devem ser criadas as demais. O mapa real de filas criadas é mantido em `docs/CONTEXT.md` § 3.
+
 | Fila                        | Produtor                                  | Consumidor                                 | Chave de idempotência                     |
 | --------------------------- | ----------------------------------------- | ------------------------------------------ | ----------------------------------------- |
 | `pgmq_notifications`        | Qualquer evento de domínio                | Worker de notificações                     | `event_id`                                |

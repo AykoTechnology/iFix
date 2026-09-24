@@ -11,7 +11,8 @@ name: CI
 #             5 (RLS, por teste estrutural) · 6 (drift de OpenAPI)
 #             8 (dependências e segredos) · 9 (imagem + Trivy, api e workers)
 #             7 (Axe por história do Storybook) · 10 (design tokens) · 12 (ADRs)
-#             11 (Helm — helm lint, kubeconform, PSS Restricted + Regra de Ouro 8)
+#             11 (Helm — helm lint, kubeconform, admissão PSS restricted num
+#                kube-apiserver real, Regra de Ouro 8)
 #   pendentes charts/infra fica de fora do gate 11: ainda é só README, à espera dos
 #             riscos R9 (modelo de entrega) e R6 (destino de observabilidade) da
 #             especificação. O job confere que continua vazio — não é passo que
@@ -225,29 +226,42 @@ jobs:
 
       - run: npm ci
 
+      # Os binários do gate são conferidos contra o SHA-256 publicado na release, fixado
+      # aqui — não contra um `.sha256sum` baixado da mesma origem, que só pegaria
+      # corrupção, nunca um artefato trocado. Atualizar a versão exige atualizar o hash.
       - name: Instalar helm
         env:
           HELM_VERSION: 3.22.0
+          HELM_SHA256: 1e4ab49e429626cf6c6958d914248b78c9730803c2751b87627e171dc800e7bb
         run: |
-          curl -sSLf "https://get.helm.sh/helm-v${HELM_VERSION}-linux-amd64.tar.gz" | tar -xz
+          curl -sSLf -o helm.tar.gz "https://get.helm.sh/helm-v${HELM_VERSION}-linux-amd64.tar.gz"
+          echo "${HELM_SHA256}  helm.tar.gz" | sha256sum --check --strict
+          tar -xzf helm.tar.gz linux-amd64/helm
           sudo install linux-amd64/helm /usr/local/bin/helm
-          rm -rf linux-amd64
+          rm -rf linux-amd64 helm.tar.gz
 
       - name: Instalar kubeconform
         env:
           KUBECONFORM_VERSION: 0.8.0
+          KUBECONFORM_SHA256: 9bc2bffbf71f261128533edaf912153948b7ff238f9a531ae6d34466ec287883
         run: |
-          curl -sSLf "https://github.com/yannh/kubeconform/releases/download/v${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz" \
-            | tar -xz kubeconform
+          curl -sSLf -o kubeconform.tar.gz "https://github.com/yannh/kubeconform/releases/download/v${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz"
+          echo "${KUBECONFORM_SHA256}  kubeconform.tar.gz" | sha256sum --check --strict
+          tar -xzf kubeconform.tar.gz kubeconform
           sudo install kubeconform /usr/local/bin/kubeconform
+          rm -f kubeconform kubeconform.tar.gz
 
       - name: helm lint
         run: npm run helm:lint
 
       # `kubeconform` prova que o YAML renderizado é um manifesto Kubernetes válido —
       # inclusive o `ScaledObject`/`TriggerAuthentication` do KEDA, cujo schema não
-      # vem embutido no `kubeconform` e por isso é buscado no catálogo da datree.
+      # vem embutido no `kubeconform` e por isso é buscado no catálogo da datree —
+      # fixado num commit, não no branch `main`: um schema alterado a montante mudaria
+      # o que este gate aceita sem nenhuma mudança neste repositório.
       - name: Schema Kubernetes/KEDA
+        env:
+          CRDS_CATALOG_SHA: ad3b08c5045129d7bb1eeffd8e61719b2c8dd1e2
         run: |
           set -euo pipefail
           for chart in charts/api charts/workers; do
@@ -255,7 +269,7 @@ jobs:
             helm template "$chart" --kube-version 1.30.0 | kubeconform \
               -kubernetes-version 1.30.0 -summary -strict \
               -schema-location default \
-              -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json'
+              -schema-location "https://raw.githubusercontent.com/datreeio/CRDs-catalog/${CRDS_CATALOG_SHA}/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json"
           done
 
       # A parte que `helm lint`/`kubeconform` não cobrem: que o Deployment
@@ -263,6 +277,28 @@ jobs:
       # (ADR-001, Regra de Ouro 8) — ver scripts/check-helm-security.mjs.
       - name: PodSecurityStandards Restricted + Regra de Ouro 8
         run: npm run helm:security
+
+      # A lista acima é mantida à mão. Este passo pergunta ao próprio Kubernetes: sobe
+      # um kube-apiserver 1.30 (sem nós, sem Docker — a admissão da PSS roda dentro do
+      # apiserver) e aplica os workloads com --dry-run=server num namespace
+      # `restricted`. Ver scripts/check-helm-psa.mjs, inclusive o controle negativo.
+      # 1.26 porque o setup-envtest v0.25.1 exige go >= 1.26. Declarar menos faz o
+      # GOTOOLCHAIN=auto baixar outra toolchain em silêncio — o workflow deixaria de
+      # dizer com qual Go o gate realmente roda.
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+          cache: false
+
+      - name: Admissão real da PSS (kube-apiserver 1.30)
+        env:
+          SETUP_ENVTEST_VERSION: v0.25.1
+          ENVTEST_K8S_VERSION: 1.30.3
+        run: |
+          go install "sigs.k8s.io/controller-runtime/tools/setup-envtest@${SETUP_ENVTEST_VERSION}"
+          KUBEBUILDER_ASSETS="$("$(go env GOPATH)/bin/setup-envtest" use "${ENVTEST_K8S_VERSION}" -p path)"
+          export KUBEBUILDER_ASSETS
+          npm run helm:psa
 
       # charts/infra ainda não tem conteúdo (ver cabeçalho do arquivo). Este passo
       # não é decorativo: falha assim que alguém adicionar `templates/` sem também

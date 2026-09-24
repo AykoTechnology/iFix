@@ -54,6 +54,8 @@ Plataforma cloud-native de **ESM/ITSM** (Enterprise & IT Service Management), mu
 | 11 validação de charts          | ativo    | `helm lint`, `helm template \| kubeconform` (inclui schema do KEDA) verificador próprio de PSS Restricted + Regra de Ouro 8 (`scripts/check-helm-security.mjs`) e admissão PSS `restricted` num `kube-apiserver` 1.30 real (`scripts/check-helm-psa.mjs`); binários conferidos por SHA-256 e catálogo de schemas fixado em commit; `charts/infra` fica de fora, README apenas — ver ressalva abaixo |
 | 12 sincronia documental         | ativo    |                                                                                                                                                                                                                                                                                                                                                                                                     |
 
+**"Ativo" significa que o gate executa e fica vermelho — ainda não que bloqueia o merge.** A `main` não tem proteção de branch com checks obrigatórios, então um PR com CI vermelho pode ser mergeado. Ligar isso exige permissão de administrador do repositório e está registrado na Issue #27; até lá, conferir o CI verde antes do merge é disciplina do revisor, não garantia da esteira.
+
 Gates pendentes **não** têm etapa correspondente na esteira. Adicionar um passo que sempre passa produziria a ilusão de cobertura — o custo disso já foi pago uma vez neste repositório (ver playbook, entrada sobre o contrato OpenAPI vazio).
 
 ### CodeQL depende de GitHub Advanced Security

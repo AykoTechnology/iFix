@@ -64,7 +64,7 @@ A plataforma foi concebida sobre o paradigma de entrega ágil, resiliente e audi
 | Camada Arquitetural                   | Componente Tecnológico                                                                                                              | Justificativa Técnica e Prontidão Kubernetes                                                                                                                                                       |
 | ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Linguagem & Runtime                   | Node.js 22 LTS (TypeScript estrito) sobre Fastify                                                                                   | Processamento assíncrono de alta performance com baixo consumo de memória e validação estrita de esquemas via Zod                                                                                  |
-| Imagem de Contêiner                   | Google Distroless (`gcr.io/distroless/nodejs22-debian12`)                                                                           | Eliminação de utilitários de shell, gerenciadores de pacotes e binários de SO. Redução drástica da superfície de vulnerabilidades (CVEs)                                                           |
+| Imagem de Contêiner                   | Google Distroless (`gcr.io/distroless/nodejs22-debian13`)                                                                           | Eliminação de utilitários de shell, gerenciadores de pacotes e binários de SO. Redução drástica da superfície de vulnerabilidades (CVEs)                                                           |
 | Persistência Relacional               | PostgreSQL 16+ via Supabase Self-Hosted                                                                                             | Kernel transacional robusto, com suporte a particionamento nativo de tabelas e indexação analítica                                                                                                 |
 | Segurança de Acesso (RLS)             | Supabase Row Level Security (RLS)                                                                                                   | O isolamento entre inquilinos e partições departamentais é forçado nativamente pelo PostgreSQL via claims do JWT                                                                                   |
 | Mensageria & Filas                    | Supabase Queues (pgmq)                                                                                                              | Filas transacionais com suporte a visibilidade, Dead Letter Queue (DLQ) e garantias ACID executadas diretamente no banco de dados                                                                  |
@@ -458,8 +458,9 @@ Toda fila de produção possui DLQ com alerta associado (Épico 12.5). O mapa vi
 O contêiner de produção é construído em múltiplos estágios:
 
 - **Estágio de Build**: Baseado em `node:22-alpine`. Compila o TypeScript, roda a validação estática de tipos e gera as dependências puras de produção via `npm ci --omit=dev`.
-- **Estágio Final de Execução**: Baseado em `gcr.io/distroless/nodejs22-debian12`. Apenas os artefatos compilados e os módulos essenciais são incorporados.
+- **Estágio Final de Execução**: Baseado em `gcr.io/distroless/nodejs22-debian13`. Apenas os artefatos compilados e os módulos essenciais são incorporados.
 - **Segurança de Execução**: O processo roda obrigatoriamente sob o usuário `USER nonroot:nonroot`, com sistema de arquivos montado como somente leitura (`readOnlyRootFilesystem: true`) e proibição expressa de elevação de privilégios (`allowPrivilegeEscalation: false`).
+- Um único `Dockerfile` produz as duas imagens de execução (`api` e `workers`): os estágios `build`/`deps`/`runtime-base` são compartilhados, e `docker build --target runtime-api` ou `--target runtime-workers` escolhe qual sobe — evita duplicar a lógica de empacotamento entre os dois serviços.
 
 ### 6.3. Requisitos Operacionais em Kubernetes
 
@@ -547,13 +548,15 @@ Em caso de divergência entre fontes, a ordem de autoridade é:
 ### ADR-001: Adoção de Node.js em Imagens Google Distroless
 
 - **Status:** Aprovado
-- **Decisão:** Utilizar Node.js 22 LTS com TypeScript rodando sobre `gcr.io/distroless/nodejs22-debian12`.
+- **Decisão:** Utilizar Node.js 22 LTS com TypeScript rodando sobre `gcr.io/distroless/nodejs22-debian13`.
 - **Consequências:**
   - Elimina binários vulneráveis e pacotes desnecessários nos contêineres de produção.
   - Obriga que qualquer ferramenta de diagnóstico seja executada via contêineres efêmeros de depuração (_ephemeral debug containers_) no Kubernetes — não há shell para `kubectl exec`.
   - `[+]` Como a depuração ao vivo é inviável, a instrumentação de observabilidade (ADR-008) deixa de ser desejável e passa a ser a **única** via de diagnóstico em produção: um módulo sem trace é um módulo cego.
   - `[+]` Logs vão exclusivamente para `stdout`/`stderr` em JSON estruturado; gravação em arquivo local é proibida (não há como lê-lo depois).
   - `[+]` O build multi-estágio é obrigatório e a imagem final não contém `devDependencies`, código-fonte TypeScript nem arquivos de teste.
+  - `[+]` A base é `debian13`, não `debian12`: a variante `debian12` carrega uma versão de `libssl3` com vulnerabilidades já corrigidas a montante (o gate 9 bloqueia CVSS ≥ 7.0), e Distroless não tem gerenciador de pacotes — sem shell não há como atualizar de dentro da imagem, então a única correção possível é trocar a base. A tag permanece flutuante de propósito: fixá-la por digest congelaria a imagem na versão vulnerável do momento, e é a reconstrução periódica a montante que mantém as correções chegando.
+  - `[+]` A imagem Distroless não tem `sleep` nem qualquer outro binário para um `preStop` do tipo `exec` — o encerramento coordenado (Regra de Ouro 8, §10.1) usa o handler nativo do kubelet, `lifecycle.preStop.sleep.seconds` (Kubernetes 1.30+, KEP-3960), em vez de `exec.command: ["sleep", "N"]`. Os charts Helm (`charts/api`, `charts/workers`) declaram `kubeVersion: ">=1.30.0-0"` por causa disso — um cluster mais antigo rejeitaria a instalação em vez de silenciosamente ignorar o `preStop`.
 
 ### ADR-002: Utilização do Supabase Self-Hosted e Supabase Queues (pgmq)
 

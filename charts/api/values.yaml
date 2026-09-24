@@ -1,0 +1,80 @@
+# Valores do chart do api. O securityContext do Pod e do contêiner NÃO é exposto
+# aqui de propósito: PodSecurityStandards Restricted e a Regra de Ouro 1 (imutabilidade
+# Distroless) não são uma preferência de ambiente, são invariante do produto — se
+# fossem parâmetro, um `values-prod.yaml` poderia desligá-las em silêncio.
+
+image:
+  repository: ifix-api
+  # Vazio usa .Chart.AppVersion — mesma convenção do chart do worker.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+replicaCount: 2
+
+service:
+  port: 3000
+
+probes:
+  # Os três caminhos batem com `src/api/src/server.ts` — mudar um lado sem o outro é
+  # exatamente o defeito que os testes de `tests/api-http.test.ts` já pegam no CI,
+  # mas só depois do deploy é que apareceria como pod nunca ficando Ready.
+  liveness:
+    path: /health/live
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 2
+    failureThreshold: 3
+  readiness:
+    path: /health/ready
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 2
+    failureThreshold: 3
+  startup:
+    path: /health/startup
+    # ~150s de orçamento (30 tentativas × 5s) para a migração terminar de rodar antes
+    # de a liveness ter chance de reprovar o pod que ainda está inicializando.
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 30
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    # Sem limite de CPU de propósito: um limite de CPU produz *throttling* sob rajada
+    # mesmo com capacidade ociosa no nó, e é exatamente sob rajada que a latência
+    # menos pode piorar. O HPA por CPU abaixo é o mecanismo de conter o uso agregado.
+    memory: 256Mi
+
+# terminationGracePeriodSeconds: 30 é a Regra de Ouro 8 e não é exposto como valor —
+# ver a mesma justificativa do securityContext acima.
+preStopSleepSeconds: 5
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+# Segredos e configuração vêm de fora do chart (Épico 12.6 — origem única de
+# segredos): o chart só referencia nomes, nunca gera Secret nem ConfigMap com valor.
+envFrom:
+  - secretRef:
+      name: ifix-api-env
+extraEnv: []
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

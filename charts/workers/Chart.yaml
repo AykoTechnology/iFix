@@ -1,0 +1,7 @@
+apiVersion: v2
+name: ifix-workers
+description: Worker de consumo das filas pgmq do iFix (src/workers) — Node 22 em Distroless, sem Fastify e sem porta de negócio.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+kubeVersion: ">=1.30.0-0"

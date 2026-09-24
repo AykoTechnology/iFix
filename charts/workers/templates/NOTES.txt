@@ -1,0 +1,19 @@
+iFix workers implantado como "{{ include "ifix-workers.fullname" . }}" no namespace {{ .Release.Namespace }}.
+
+Verifique o rollout:
+  kubectl -n {{ .Release.Namespace }} rollout status deployment/{{ include "ifix-workers.fullname" . }}
+
+Este chart não cria Service: o worker não serve tráfego de negócio, e o
+kubelet fala com as probes direto no IP do pod.
+
+Este chart não cria o Secret "{{ .Values.databaseSecret.name }}" referenciado
+por envFrom e pelo TriggerAuthentication do KEDA — ele precisa existir no
+namespace antes da instalação, com as chaves PGHOST/PGPORT/PGUSER/PGDATABASE/
+PGPASSWORD (Épico 12.6: origem única de segredos, nunca gerada pelo chart).
+{{- if .Values.keda.enabled }}
+
+Autoscaling via KEDA ({{ .Values.keda.minReplicaCount }}–{{ .Values.keda.maxReplicaCount }}
+réplicas) pelo comprimento da fila `pgmq.q_notifications`. Acompanhe com:
+  kubectl -n {{ .Release.Namespace }} get scaledobject {{ include "ifix-workers.fullname" . }}
+  kubectl -n {{ .Release.Namespace }} get hpa keda-hpa-{{ include "ifix-workers.fullname" . }}
+{{- end }}

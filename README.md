@@ -48,12 +48,13 @@ As 11 Regras de Ouro, cada uma com o gate de CI que a torna mecânica, estão na
 - **Banco**: migração de fundação com o padrão de referência de RLS nos dois eixos, auditoria por trigger imutável e `uuid_generate_v7()`.
 - **API**: servidor Fastify com contexto de requisição aplicado por GUC transacional, três probes distintas e contrato OpenAPI 3.1 derivado do Zod.
 - **Design**: `tokens.json` compilado por Style Dictionary em variáveis CSS e tema do Tailwind, com gate de drift e de literal estético.
-- **Fila**: `notifications` em pgmq com publicação transacional e consumidor idempotente com DLQ.
+- **Fila**: `notifications` em pgmq com publicação transacional e consumidor idempotente com DLQ; worker com as três probes próprias (`src/workers/src/probes.ts`).
 - **Interface**: Storybook com Axe por história; primeiro componente consumindo os tokens.
-- **Esteira**: 11 dos 12 gates da § 6.4 ativos; imagem Distroless `nonroot` com varredura Trivy.
-- **Testes**: 63 testes contra PostgreSQL real, incluindo testes estruturais que reprovam qualquer tabela sem RLS forçada.
+- **Empacotamento**: um `Dockerfile` produz `ifix-api` e `ifix-workers`; charts Helm (`charts/api`, `charts/workers`) com PSS Restricted, as três probes, `terminationGracePeriodSeconds: 30`, HPA e autoscaling do worker por comprimento de fila (KEDA).
+- **Esteira**: os 12 gates da § 6.4 ativos; imagens Distroless `nonroot` com varredura Trivy; charts validados por `helm lint`, `kubeconform` e verificador próprio de conformidade estrutural.
+- **Testes**: mais de 220 testes contra PostgreSQL real, incluindo testes estruturais que reprovam qualquer tabela sem RLS forçada.
 
-Pendentes da fase: Helm charts (gate 11) e SDK OpenTelemetry — este bloqueado pelo **R6**, que define o destino de exportação. Ver `docs/CONTEXT.md` § 1.
+Pendentes da fase: SDK OpenTelemetry, bloqueado pelo **R6** (destino de exportação); `charts/infra`, que fica só `README.md` até o **R9** (modelo de entrega) decidir onde o Supabase Self-Hosted roda. Ver `docs/CONTEXT.md` § 1.
 
 ## Governança de documentação
 

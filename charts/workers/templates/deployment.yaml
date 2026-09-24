@@ -1,0 +1,133 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ifix-workers.fullname" . }}
+  labels:
+    {{- include "ifix-workers.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.keda.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  # Sem `replicas` quando o KEDA está ligado: o ScaledObject cria um HPA que
+  # controla este campo, e declará-lo aqui só criaria um cabo de guerra entre
+  # o Helm e o controller a cada reconciliação.
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      {{- include "ifix-workers.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "ifix-workers.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "ifix-workers.serviceAccountName" . }}
+      automountServiceAccountToken: false
+
+      # PodSecurityStandards Restricted + Regra de Ouro 1 — mesma justificativa
+      # do chart do api. Fixo no template, não em values.yaml.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+
+      # Regra de Ouro 8 — mesma justificativa do chart do api:
+      # SHUTDOWN_TIMEOUT_MS (25s) fica abaixo deste valor de propósito.
+      terminationGracePeriodSeconds: 30
+
+      containers:
+        - name: workers
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+
+          ports:
+            # Só as probes — não há porta de negócio (ver comentário em
+            # values.yaml sobre a ausência de Service neste chart).
+            - name: probes
+              containerPort: {{ .Values.probePort }}
+              protocol: TCP
+
+          env:
+            - name: PROBE_HOST
+              value: "0.0.0.0"
+            - name: PROBE_PORT
+              value: {{ .Values.probePort | quote }}
+          {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.envFrom }}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+
+          # `lifecycle.preStop.sleep` — mesma justificativa do chart do api.
+          # Aqui não há endpoint de Service para drenar, mas o KEDA para de
+          # rotear trabalho novo para um pod marcado para saída antes do
+          # SIGTERM chegar, e a pausa dá essa margem.
+          lifecycle:
+            preStop:
+              sleep:
+                seconds: {{ .Values.preStopSleepSeconds }}
+
+          startupProbe:
+            httpGet:
+              path: {{ .Values.probes.startup.path }}
+              port: probes
+            periodSeconds: {{ .Values.probes.startup.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.startup.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.startup.failureThreshold }}
+
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.probes.liveness.path }}
+              port: probes
+            initialDelaySeconds: {{ .Values.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.liveness.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.liveness.failureThreshold }}
+
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.probes.readiness.path }}
+              port: probes
+            initialDelaySeconds: {{ .Values.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.readiness.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.readiness.failureThreshold }}
+
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
+
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

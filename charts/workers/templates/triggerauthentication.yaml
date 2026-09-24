@@ -1,0 +1,30 @@
+{{- if .Values.keda.enabled }}
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: {{ include "ifix-workers.fullname" . }}-pg
+  labels:
+    {{- include "ifix-workers.labels" . | nindent 4 }}
+spec:
+  # Lê do MESMO Secret referenciado em `envFrom` (values.yaml,
+  # `databaseSecret.name` == `envFrom[0].secretRef.name` por convenção) — uma
+  # segunda cópia da credencial divergiria da que o processo usa de fato mais
+  # cedo ou mais tarde, e o KEDA passaria a decidir escalar com um banco que
+  # não é o do worker.
+  secretTargetRef:
+    - parameter: host
+      name: {{ .Values.databaseSecret.name }}
+      key: {{ .Values.databaseSecret.hostKey }}
+    - parameter: port
+      name: {{ .Values.databaseSecret.name }}
+      key: {{ .Values.databaseSecret.portKey }}
+    - parameter: userName
+      name: {{ .Values.databaseSecret.name }}
+      key: {{ .Values.databaseSecret.userNameKey }}
+    - parameter: dbName
+      name: {{ .Values.databaseSecret.name }}
+      key: {{ .Values.databaseSecret.dbNameKey }}
+    - parameter: password
+      name: {{ .Values.databaseSecret.name }}
+      key: {{ .Values.databaseSecret.passwordKey }}
+{{- end }}

@@ -8,3 +8,7 @@ export {
 } from "./tenancy.js";
 
 export { withRequestContext } from "./db-context.js";
+
+export { checkLiveness, checkReadiness, checkStartup, type ProbeResult } from "./health.js";
+
+export { probeResponseSchema, type ProbeResponse } from "./probes.js";

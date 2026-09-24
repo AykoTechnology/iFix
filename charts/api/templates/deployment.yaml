@@ -1,0 +1,141 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ifix-api.fullname" . }}
+  labels:
+    {{- include "ifix-api.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  # Cirúrgico, não "recrie tudo": um pod de cada vez sobe antes de o anterior sair,
+  # e o preStop abaixo dá tempo do Service parar de rotear para quem está saindo
+  # antes do SIGTERM chegar — é o "Encerramento Coordenado" da § 4.3.
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      {{- include "ifix-api.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "ifix-api.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "ifix-api.serviceAccountName" . }}
+      automountServiceAccountToken: false
+
+      # PodSecurityStandards Restricted + Regra de Ouro 1 (imutabilidade Distroless).
+      # Fixo no template, não em values.yaml — ver o comentário no topo de values.yaml.
+      securityContext:
+        runAsNonRoot: true
+        # 65532 é o uid/gid `nonroot` da própria imagem Distroless (`USER nonroot:nonroot`
+        # no Dockerfile) — não um número escolhido aqui, é o que a imagem já usa.
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+
+      # `terminationGracePeriodSeconds: 30` é a Regra de Ouro 8 (não é valor
+      # configurável — ver values.yaml). `SHUTDOWN_TIMEOUT_MS` da aplicação é 25s,
+      # deliberadamente menor: o processo tem que terminar de drenar ANTES do
+      # SIGKILL, não no mesmo instante.
+      terminationGracePeriodSeconds: 30
+
+      containers:
+        - name: api
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+
+          env:
+            - name: HOST
+              value: "0.0.0.0"
+            - name: PORT
+              value: {{ .Values.service.port | quote }}
+          {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.envFrom }}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+
+          # `lifecycle.preStop.sleep` — não `exec` — porque a imagem não tem shell
+          # nem binário `sleep` (ADR-001). É o handler NATIVO do kubelet (Kubernetes
+          # 1.30+, ver `kubeVersion` no Chart.yaml): pausa antes de mandar SIGTERM,
+          # dando tempo do endpoint sair do Service enquanto o pod ainda responde.
+          # Sem isso, uma requisição em voo durante rolling update pode cair num pod
+          # que já parou de aceitar conexão mas o balanceador ainda não sabia.
+          lifecycle:
+            preStop:
+              sleep:
+                seconds: {{ .Values.preStopSleepSeconds }}
+
+          startupProbe:
+            httpGet:
+              path: {{ .Values.probes.startup.path }}
+              port: http
+            periodSeconds: {{ .Values.probes.startup.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.startup.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.startup.failureThreshold }}
+
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.probes.liveness.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.liveness.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.liveness.failureThreshold }}
+
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.probes.readiness.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.readiness.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.readiness.failureThreshold }}
+
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+
+          # A única escrita permitida é /tmp, montado — nunca no sistema de arquivos
+          # da imagem, que é somente leitura (Regra de Ouro 1). Nada no processo
+          # escreve hoje, mas o volume existe para que uma dependência futura que
+          # precise de um diretório temporário tenha onde, sem reabrir o filesystem.
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
+
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

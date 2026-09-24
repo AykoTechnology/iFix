@@ -18,39 +18,41 @@ Plataforma cloud-native de **ESM/ITSM** (Enterprise & IT Service Management), mu
 
 ### Módulos concluídos
 
-| Módulo                          | Entregue                                                                                                                                              |
-| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Padrão de referência de RLS** | `supabase/migrations/20260922000001_foundation.sql` — tenancy em dois eixos, auditoria imutável, UUID v7. É o formato que toda migração futura copia. |
-| **Trilha de auditoria**         | `audit.logs` particionada, captura por gatilho, imutável por privilégio **e** por gatilho (resiste a superusuário)                                    |
-| **Suíte de vazamento**          | 23 testes contra PostgreSQL real, verificados por mutação — cada teste foi visto falhando quando a proteção que afirma verificar é removida           |
-| **Tooling do monorepo**         | npm workspaces, TypeScript estrito, ESLint (com as regras que sustentam as Regras de Ouro 7 e 11), Prettier, Vitest                                   |
-| **Contrato de claims**          | `src/shared` — `jwtClaimsSchema` é o contrato entre autenticação e políticas RLS, validado antes de virar GUC                                         |
-| **API HTTP**                    | `src/api` — Fastify, as três probes da § 6.3, autenticação JWT, `GET /v1/people` e graceful shutdown em 25s                                           |
-| **Contexto transacional**       | `withRequestContext` aplica claims com `SET LOCAL`, de modo que morram no commit e não vazem para a próxima requisição da mesma conexão de pool       |
-| **Contrato OpenAPI**            | `docs/api/openapi.json` derivado dos schemas Zod, com gate 6 verificando drift                                                                        |
-| **Design tokens**               | `design-system/build.mjs` compila `tokens.json` em `dist/tokens.css` e `dist/tailwind-theme.js` (Style Dictionary v4, ADR-011)                        |
-| **Interface**                   | Storybook com `addon-a11y`, primeiro componente consumindo os tokens compilados (ADR-005, ADR-011)                                                    |
-| **Fila assíncrona**             | `notifications` em pgmq, publicação transacional por `app.publish_event`, consumidor idempotente com DLQ (ADR-002)                                    |
-| **Empacotamento**               | `Dockerfile` multi-estágio para Distroless, `nonroot`, sem devDependencies nem fontes TS na imagem final                                              |
-| **Esteira de CI**               | `.github/workflows/` com os gates 1, 2, 3, 4, 5, 6, 8, 9 e 12 ativos                                                                                  |
-| **Graceful shutdown**           | Provado contra o artefato **compilado**: SIGTERM e SIGINT saem com código 0, drenam e registram no log (Regra de Ouro 8)                              |
+| Módulo                          | Entregue                                                                                                                                                                                                 |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Padrão de referência de RLS** | `supabase/migrations/20260922000001_foundation.sql` — tenancy em dois eixos, auditoria imutável, UUID v7. É o formato que toda migração futura copia.                                                    |
+| **Trilha de auditoria**         | `audit.logs` particionada, captura por gatilho, imutável por privilégio **e** por gatilho (resiste a superusuário)                                                                                       |
+| **Suíte de vazamento**          | 23 testes contra PostgreSQL real, verificados por mutação — cada teste foi visto falhando quando a proteção que afirma verificar é removida                                                              |
+| **Tooling do monorepo**         | npm workspaces, TypeScript estrito, ESLint (com as regras que sustentam as Regras de Ouro 7 e 11), Prettier, Vitest                                                                                      |
+| **Contrato de claims**          | `src/shared` — `jwtClaimsSchema` é o contrato entre autenticação e políticas RLS, validado antes de virar GUC                                                                                            |
+| **API HTTP**                    | `src/api` — Fastify, as três probes da § 6.3, autenticação JWT, `GET /v1/people` e graceful shutdown em 25s                                                                                              |
+| **Contexto transacional**       | `withRequestContext` aplica claims com `SET LOCAL`, de modo que morram no commit e não vazem para a próxima requisição da mesma conexão de pool                                                          |
+| **Contrato OpenAPI**            | `docs/api/openapi.json` derivado dos schemas Zod, com gate 6 verificando drift                                                                                                                           |
+| **Design tokens**               | `design-system/build.mjs` compila `tokens.json` em `dist/tokens.css` e `dist/tailwind-theme.js` (Style Dictionary v4, ADR-011)                                                                           |
+| **Interface**                   | Storybook com `addon-a11y`, primeiro componente consumindo os tokens compilados (ADR-005, ADR-011)                                                                                                       |
+| **Fila assíncrona**             | `notifications` em pgmq, publicação transacional por `app.publish_event`, consumidor idempotente com DLQ (ADR-002)                                                                                       |
+| **Probes do worker**            | `src/workers/src/probes.ts` — as três probes de `@ifix/shared` (`health.ts`/`probes.ts`, promovidas do `src/api`) num `node:http` próprio, porta 3001                                                    |
+| **Empacotamento**               | `Dockerfile` multi-estágio para Distroless, `nonroot`, sem devDependencies nem fontes TS na imagem final; um único arquivo produz `ifix-api` e `ifix-workers` (`--target runtime-api`/`runtime-workers`) |
+| **Charts Helm**                 | `charts/api` e `charts/workers` — PSS Restricted, três probes, `terminationGracePeriodSeconds: 30`, HPA (api) e KEDA por fila `pgmq` (workers)                                                           |
+| **Esteira de CI**               | `.github/workflows/` com os gates 1, 2, 3, 4, 5, 6, 8, 9, 11 e 12 ativos                                                                                                                                 |
+| **Graceful shutdown**           | Provado contra o artefato **compilado**: SIGTERM e SIGINT saem com código 0, drenam e registram no log (Regra de Ouro 8)                                                                                 |
 
 ### Estado dos 12 gates da esteira (§ 6.4)
 
-| Gate                            | Situação     | Observação                                                                           |
-| ------------------------------- | ------------ | ------------------------------------------------------------------------------------ |
-| 1 lint e formatação             | ativo        | inclui as regras que sustentam as Regras de Ouro 7 e 11                              |
-| 2 verificação de tipos          | ativo        |                                                                                      |
-| 3 testes e cobertura            | ativo        | piso de 85%; hoje em 99,7% de linhas e 88,6% de branches                             |
-| 4 integração                    | ativo        | PostgreSQL real em service container                                                 |
-| 5 verificação de RLS            | ativo        | por teste estrutural, vale para toda tabela futura                                   |
-| 6 drift de OpenAPI              | ativo        |                                                                                      |
-| 7 acessibilidade                | ativo        | Axe por história do Storybook; ver nota sobre o limite do jsdom                      |
-| 8 SAST, dependências e segredos | ativo        | CodeQL, `npm audit` e Gitleaks — os três executando; ver nota abaixo                 |
-| 9 imagem e Trivy                | ativo        | imagem construída e varrida no CI; base em `nodejs22-debian13` — ver ressalva abaixo |
-| 10 auditoria de design tokens   | ativo        | drift dos artefatos + literais estéticos; ver nota abaixo                            |
-| 11 validação de charts          | **pendente** | aguarda os charts terem conteúdo                                                     |
-| 12 sincronia documental         | ativo        |                                                                                      |
+| Gate                            | Situação | Observação                                                                                                                                                                                                                          |
+| ------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1 lint e formatação             | ativo    | inclui as regras que sustentam as Regras de Ouro 7 e 11                                                                                                                                                                             |
+| 2 verificação de tipos          | ativo    |                                                                                                                                                                                                                                     |
+| 3 testes e cobertura            | ativo    | piso de 85%; hoje em 99,7% de linhas e 88,6% de branches                                                                                                                                                                            |
+| 4 integração                    | ativo    | PostgreSQL real em service container                                                                                                                                                                                                |
+| 5 verificação de RLS            | ativo    | por teste estrutural, vale para toda tabela futura                                                                                                                                                                                  |
+| 6 drift de OpenAPI              | ativo    |                                                                                                                                                                                                                                     |
+| 7 acessibilidade                | ativo    | Axe por história do Storybook; ver nota sobre o limite do jsdom                                                                                                                                                                     |
+| 8 SAST, dependências e segredos | ativo    | CodeQL, `npm audit` e Gitleaks — os três executando; ver nota abaixo                                                                                                                                                                |
+| 9 imagem e Trivy                | ativo    | imagem construída e varrida no CI; base em `nodejs22-debian13` — ver ressalva abaixo                                                                                                                                                |
+| 10 auditoria de design tokens   | ativo    | drift dos artefatos + literais estéticos; ver nota abaixo                                                                                                                                                                           |
+| 11 validação de charts          | ativo    | `helm lint`, `helm template \| kubeconform` (inclui schema do KEDA) e verificador próprio de PSS Restricted + Regra de Ouro 8 (`scripts/check-helm-security.mjs`); `charts/infra` fica de fora, README apenas — ver ressalva abaixo |
+| 12 sincronia documental         | ativo    |                                                                                                                                                                                                                                     |
 
 Gates pendentes **não** têm etapa correspondente na esteira. Adicionar um passo que sempre passa produziria a ilusão de cobertura — o custo disso já foi pago uma vez neste repositório (ver playbook, entrada sobre o contrato OpenAPI vazio).
 
@@ -90,7 +92,7 @@ Dispensa pontual existe com `tokens-exempt: <motivo>` na linha. O motivo é obri
 
 ### Ressalva sobre o Dockerfile
 
-Este ambiente de desenvolvimento não tem daemon Docker, então a imagem **não é construída aqui**. O que se verifica localmente é o layout de runtime, simulado em diretório separado (`npm ci --omit=dev` + `dist` copiado): o processo sobe, responde às três probes e encerra com SIGTERM.
+Este ambiente de desenvolvimento não tem daemon Docker, então a imagem **não é construída aqui**. O que se verifica localmente é o layout de runtime, simulado em diretório separado (`npm ci --omit=dev` + `dist` copiado): o processo sobe, responde às três probes e encerra com SIGTERM. Isso agora vale para os dois alvos — `runtime-api` e `runtime-workers` — não só para a API.
 
 A primeira construção real ocorreu no job `container` da esteira e **resolveu sem erro** — o Dockerfile está validado. A varredura do Trivy, porém, reprovou: a base `nodejs22-debian12` carrega `libssl3` 3.0.18, com 6 vulnerabilidades já corrigidas a montante (1 crítica, 5 altas). Distroless não tem gerenciador de pacotes, então não há correção de dentro da imagem; a base passou para `nodejs22-debian13`, que usa o mesmo Node 22 LTS e varre limpa.
 
@@ -100,11 +102,17 @@ Onde não houver Docker, o Trivy escaneia a base direto do registro — útil pa
 trivy image --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed gcr.io/distroless/nodejs22-debian13
 ```
 
+### Ressalva sobre os charts Helm
+
+`charts/api` e `charts/workers` estão completos e validados (`helm lint`, `helm template | kubeconform`, `scripts/check-helm-security.mjs`), mas nenhum dos dois foi instalado contra um cluster Kubernetes real — este ambiente não tem um disponível. O que a validação prova é que o YAML renderizado é sintaticamente válido e estruturalmente conforme (PSS Restricted, Regra de Ouro 8, as três probes); não prova que um `helm install` realmente sobe o pod, nem que o KEDA de fato escala o worker contra um `pgmq` real — isso fica para quando o R9 (modelo de entrega) decidir onde o cluster roda.
+
+`charts/infra` permanece só `README.md`, de propósito: depende do R9 e do R6 (destino de observabilidade) ainda em aberto. O job `helm` da esteira confere que continua vazio a cada execução — não é um gate que sempre passa por não ter o que verificar, é um gate que falha assim que alguém adicionar conteúdo sem também estender a esteira para validá-lo.
+
 ### Próximos passos imediatos (Fase 0)
 
-1. **Storybook** com `@storybook/addon-a11y` **antes do primeiro componente** — destrava o gate 7 e é o que torna o ADR-005 efetivo.
-2. **Helm charts** com `securityContext`, as três probes e `terminationGracePeriodSeconds: 30` — destrava o gate 11.
-3. **OpenTelemetry completo** (ADR-008): o `trace-id` já vira `reqId` do Fastify e chega à auditoria pela GUC `app.trace_id`; falta o SDK com exportador OTLP — **bloqueado pelo R6**, que define o destino.
+1. **OpenTelemetry completo** (ADR-008): o `trace-id` já vira `reqId` do Fastify e chega à auditoria pela GUC `app.trace_id`; falta o SDK com exportador OTLP — **bloqueado pelo R6**, que define o destino.
+2. **Roteamento por canal** do worker de notificações (História 10.1): o consumidor já exerce o padrão completo (envelope validado, idempotência, contexto de locatário); falta o provedor real, **bloqueado pelo R5**.
+3. **`charts/infra`**: só `README.md` até o R9 (modelo de entrega) decidir se o Postgres/GoTrue/Realtime do Supabase Self-Hosted são geridos por este monorepo ou pelo chart oficial.
 
 **Marco de saída da Fase 0:** um endpoint em produção com RLS ativa, auditoria disparando, trace atravessando a fila e token de UI aplicado — ponta a ponta.
 

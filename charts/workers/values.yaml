@@ -1,0 +1,118 @@
+# Valores do chart dos workers. O securityContext do Pod e do contêiner NÃO é
+# exposto aqui de propósito — mesma justificativa do chart do api (ver
+# charts/api/values.yaml): PodSecurityStandards Restricted e a imutabilidade
+# Distroless são invariante do produto, não parâmetro de ambiente.
+
+image:
+  repository: ifix-workers
+  # Vazio usa .Chart.AppVersion — mesma convenção do chart do api.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+# Só tem efeito com keda.enabled: false — com o KEDA ligado (padrão), o
+# ScaledObject cria o HPA que decide o número de réplicas, e fixar `replicas`
+# no Deployment entraria em conflito com ele a cada reconciliação.
+replicaCount: 1
+
+# Porta onde as três probes do worker respondem (`src/workers/src/probes.ts`).
+# Não é porta de negócio: o worker não serve HTTP para o usuário final, e por
+# isso este chart não cria Service — o kubelet fala com as probes direto no
+# IP do pod, como faz com qualquer probe HTTP.
+probePort: 3001
+
+probes:
+  # Os três caminhos batem com `src/workers/src/probes.ts` — o mesmo contrato
+  # de `@ifix/shared` que a API usa, ver ADR e comentário em charts/api.
+  liveness:
+    path: /health/live
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 2
+    failureThreshold: 3
+  readiness:
+    path: /health/ready
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 2
+    failureThreshold: 3
+  startup:
+    path: /health/startup
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 30
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    # Sem limite de CPU de propósito — mesma razão do chart do api: throttling
+    # sob rajada é pior que o custo de um nó com capacidade ociosa reservada.
+    memory: 256Mi
+
+# terminationGracePeriodSeconds: 30 é a Regra de Ouro 8 e não é exposto como
+# valor — ver a mesma justificativa do securityContext acima. O
+# SHUTDOWN_TIMEOUT_MS de 25s do processo (src/workers/src/config.ts) fica
+# deliberadamente abaixo, para terminar de drenar o lote ANTES do SIGKILL.
+preStopSleepSeconds: 5
+
+# Autoscaling por comprimento de fila (KEDA), não HPA de CPU/memória: o custo
+# de processar uma notificação não escala com o tráfego HTTP de ninguém, e sim
+# com quantas mensagens estão esperando — CPU do worker ocioso não diz nada
+# sobre atraso de entrega.
+keda:
+  enabled: true
+  minReplicaCount: 1
+  maxReplicaCount: 10
+  # Em segundos. 15s (metade do padrão do KEDA) porque uma notificação
+  # atrasada é visível para quem a espera, e o custo de perguntar ao banco a
+  # mais é uma única contagem, não uma varredura de tabela.
+  pollingInterval: 15
+  # 300s (padrão do KEDA): evita reduzir e voltar a aumentar réplicas a cada
+  # oscilação de fila de segundos, sem seguir tão devagar a ponto de a fila
+  # esvaziar muito antes do número de réplicas acompanhar.
+  cooldownPeriod: 300
+  # Mensagens visíveis (prontas para consumo — `vt <= now()`, não as que estão
+  # em voo dentro do timeout de visibilidade) por réplica antes de escalar. O
+  # HPA por baixo do KEDA calcula réplicas como teto(métrica / este valor).
+  targetQueryValue: 5
+  query: "select count(*) from pgmq.q_notifications where vt <= now()"
+  # "disable" é o padrão de desenvolvimento local; ambientes gerenciados
+  # (Supabase, RDS) exigem "require" — sobrescrever por values-<ambiente>.yaml.
+  sslmode: disable
+
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+  # Desligado por padrão: um PDB com minAvailable >= 1 impede o KEDA de
+  # reduzir para 0 réplicas quando a fila esvazia. Uma disrupção voluntária no
+  # meio de um lote não perde a mensagem — ela reaparece após o timeout de
+  # visibilidade, e a idempotência do consumidor (Regra de Ouro) absorve a
+  # reentrega. Ligar só faz sentido com minReplicaCount >= 1 fixo.
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+# Segredos e configuração vêm de fora do chart (Épico 12.6 — origem única de
+# segredos): o chart só referencia nomes, nunca gera Secret nem ConfigMap com
+# valor. Mesmo Secret de onde o TriggerAuthentication do KEDA lê a credencial
+# de banco — nunca uma cópia separada, que divergiria da credencial real do
+# processo mais cedo ou mais tarde.
+envFrom:
+  - secretRef:
+      name: ifix-workers-env
+extraEnv: []
+
+databaseSecret:
+  name: ifix-workers-env
+  hostKey: PGHOST
+  portKey: PGPORT
+  userNameKey: PGUSER
+  dbNameKey: PGDATABASE
+  passwordKey: PGPASSWORD
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

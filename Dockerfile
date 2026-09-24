@@ -5,6 +5,13 @@
 # é operacional e precisa ser conhecida: **não há como `kubectl exec` num pod destes**.
 # Diagnóstico em produção é feito por contêiner efêmero de depuração e, sobretudo, pelo
 # trace e pelo log estruturado — daí a instrumentação não ser opcional (ADR-008).
+#
+# Dois serviços, um Dockerfile: `api` e `workers` compartilham o mesmo `build`/`deps`
+# e divergem só no estágio de execução — um Dockerfile por serviço duplicaria a lógica
+# de empacotamento e os dois se afastariam silenciosamente a cada mudança em um deles.
+# `docker build --target runtime-api` ou `--target runtime-workers` escolhe qual sobe;
+# sem `--target`, o padrão é o último estágio do arquivo (`runtime-api`), preservando o
+# comportamento de quem já construía a imagem sem essa flag.
 
 # ---------------------------------------------------------------------------
 # Estágio 1 — compilação
@@ -15,8 +22,9 @@ WORKDIR /app
 # Manifests antes do código: enquanto as dependências não mudarem, o Docker reaproveita
 # a camada de instalação e o build fica na casa dos segundos.
 COPY package.json package-lock.json ./
-COPY src/shared/package.json ./src/shared/
-COPY src/api/package.json ./src/api/
+COPY src/shared/package.json  ./src/shared/
+COPY src/api/package.json     ./src/api/
+COPY src/workers/package.json ./src/workers/
 RUN npm ci
 
 COPY tsconfig.base.json tsconfig.json ./
@@ -36,12 +44,13 @@ FROM node:22-alpine AS deps
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-COPY src/shared/package.json ./src/shared/
-COPY src/api/package.json ./src/api/
+COPY src/shared/package.json  ./src/shared/
+COPY src/api/package.json     ./src/api/
+COPY src/workers/package.json ./src/workers/
 RUN npm ci --omit=dev
 
 # ---------------------------------------------------------------------------
-# Estágio 3 — execução
+# Estágio 3 — base de execução comum
 # ---------------------------------------------------------------------------
 # Base em Debian 13, não 12. A variante debian12 carrega `libssl3` 3.0.18, com 6
 # vulnerabilidades corrigidas a montante (1 crítica, 5 altas) que o gate 9 bloqueia —
@@ -52,25 +61,30 @@ RUN npm ci --omit=dev
 # A tag é flutuante de propósito: uma base fixada por digest congela a imagem na
 # versão vulnerável, e a reconstrução periódica a montante é justamente o mecanismo
 # que mantém as correções chegando.
-FROM gcr.io/distroless/nodejs22-debian13 AS runtime
+FROM gcr.io/distroless/nodejs22-debian13 AS runtime-base
 WORKDIR /app
 
 ENV NODE_ENV=production
 
-COPY --from=deps  /app/node_modules ./node_modules
+COPY --from=deps /app/node_modules ./node_modules
 
 # O layout do workspace é preservado porque `node_modules/@ifix/shared` é um link
 # relativo para `src/shared`. Copiar o `dist` e o manifest mantém o alvo do link válido
 # sem arrastar o código-fonte TypeScript para dentro da imagem.
 COPY --from=build /app/src/shared/package.json ./src/shared/
 COPY --from=build /app/src/shared/dist         ./src/shared/dist
-COPY --from=build /app/src/api/package.json    ./src/api/
-COPY --from=build /app/src/api/dist            ./src/api/dist
 
 # Sem privilégio e sem escrita: o `securityContext` do pod completa com
 # readOnlyRootFilesystem e allowPrivilegeEscalation: false. A única escrita permitida
 # é em /tmp, que chega como volume montado (Regra de Ouro 1).
 USER nonroot:nonroot
+
+# ---------------------------------------------------------------------------
+# Estágio 4a — execução: api
+# ---------------------------------------------------------------------------
+FROM runtime-base AS runtime-api
+COPY --from=build /app/src/api/package.json ./src/api/
+COPY --from=build /app/src/api/dist         ./src/api/dist
 
 EXPOSE 3000
 
@@ -78,3 +92,16 @@ EXPOSE 3000
 # PID 1 e recebe SIGTERM diretamente, sem supervisor intermediário. É o que torna o
 # graceful shutdown do `src/api/src/index.ts` efetivo (Regra de Ouro 8).
 CMD ["src/api/dist/index.js"]
+
+# ---------------------------------------------------------------------------
+# Estágio 4b — execução: workers
+# ---------------------------------------------------------------------------
+FROM runtime-base AS runtime-workers
+COPY --from=build /app/src/workers/package.json ./src/workers/
+COPY --from=build /app/src/workers/dist         ./src/workers/dist
+
+# As três probes do worker (`src/workers/src/probes.ts`), não uma porta HTTP de
+# negócio — o worker não serve rota alguma ao usuário final.
+EXPOSE 3001
+
+CMD ["src/workers/dist/index.js"]

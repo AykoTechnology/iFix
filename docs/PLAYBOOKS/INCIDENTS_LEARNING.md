@@ -18,6 +18,60 @@ Toda entrada nova é adicionada ao **topo** da lista (mais recente primeiro). Ne
 
 ---
 
+### 2026-09-24 — CI 8/8 verde, e a PR ainda carregava três defeitos de severidade alta
+
+- **Sintoma**: nenhum na esteira. A PR #26 (charts Helm e gate 11) estava com todos os checks verdes e `mergeable: clean`. Uma revisão adversarial antes do merge — conferir cada afirmação escrita contra o que o código faz — encontrou três defeitos que nenhum gate via.
+- **Causas-raiz**:
+  1. **Dockerfile** — o comentário dizia que, sem `--target`, o padrão era `runtime-api`, "o último estágio". O último estágio era `runtime-workers`. `docker build -t ifix-api .` publicaria o worker com o nome da API. A esteira não pegava porque sempre passa `--target`.
+  2. **Orçamento de encerramento** — preStop de 5s + `SHUTDOWN_TIMEOUT_MS` de 25s = 30s, exatamente o `terminationGracePeriodSeconds`. O prazo do pod começa **antes** do preStop (documentação do Kubernetes, "Container Lifecycle Hooks"), então o guard que existe para sair antes do SIGKILL disparava no mesmo instante dele. O comentário do template afirmava a folga que não existia.
+  3. **Verificador do gate 11** — chamado de "PSS Restricted", aprovava contêiner com `runAsUser: 0` no próprio securityContext, `privileged`, `capabilities.add`, `hostNetwork`/`hostPID`, `hostPath`, `initContainer` como root, qualquer tipo que não fosse `Deployment` e chart com zero workloads. Nove burlas, todas verdes.
+- **Achados menores da mesma revisão**: `preStop` no worker justificado por "o KEDA para de rotear trabalho" — o KEDA não roteia nada, o worker puxa, e a pausa só comia prazo de drenagem; `sslmode: disable` como padrão de chart de produção; um comentário afirmando que `tests/api-http.test.ts` pegava divergência de caminho de probe entre chart e servidor (não pegava); uma entrada deste playbook citando outra entrada que não existe; NOTES.txt quebrando `helm install` com `envFrom` vazio.
+- **Por que é grave além do incidente**: é a quarta vez que o repositório encontra um gate medindo menos do que aparenta — mas a primeira em que o defeito estava em **texto que afirmava algo falso**, não em código que fazia algo errado. Comentário, descrição de PR e playbook não são verificados por gate nenhum, e são exatamente o que o próximo revisor lê para decidir que está tudo certo.
+- **Mitigação aplicada**: `runtime-api` voltou a ser o último estágio; o chart injeta `SHUTDOWN_TIMEOUT_MS` (20s na api, 25s no worker sem preStop) e o verificador reprova quando preStop + timeout + 2s de margem passa de 30s; o verificador cobre as nove burlas, exige preStop só em workload servido por Service e reprova chart sem workload; `tests/deploy-invariants.test.ts` compara os caminhos das probes nos charts com as rotas do código e trava a ordem do Dockerfile. Cada correção foi vista falhando por mutação antes de ser aceita.
+- **Regras novas**:
+  1. **Revisão pré-merge relê cada afirmação de comentário, descrição de PR e playbook contra o código.** CI verde prova forma, não verdade.
+  2. **Todo verificador de segurança é testado contra uma lista de burlas antes de ser aceito** — não só contra o que o autor lembrou de incluir. A pergunta é "como eu passaria por este gate sendo inseguro?".
+  3. **Invariante que atravessa arquivos vira teste que lê os arquivos**, não comentário que promete que alguém lembra.
+- **Referência**: PR #26, `scripts/check-helm-security.mjs`, `tests/helm-security.test.ts`, `tests/deploy-invariants.test.ts`, `Dockerfile`, `charts/`.
+
+### 2026-09-24 — O Dockerfile nunca construiu uma imagem para o worker
+
+- **Sintoma**: nenhum. Foi encontrado ao planejar o chart Helm dos workers — o Deployment precisava referenciar uma imagem `ifix-workers` que não existia em lugar nenhum.
+- **Causa-raiz**: o `Dockerfile` original tinha um único estágio final, que produzia `ifix-api`. O `container` job da esteira (gate 9) também construía e varria só essa imagem. O serviço `src/workers` sempre existiu, compilava, tinha teste — mas não tinha empacotamento. O gap não aparecia em teste algum porque nenhum teste verifica "existe uma imagem para este serviço": isso só se descobre tentando implantar.
+- **Por que é grave além do incidente**: é a classe de lacuna mais difícil de pegar por gate automático — não é um valor errado, é a **ausência completa** de um artefato que ninguém tinha motivo para procurar até precisar dele. Os quatro incidentes anteriores desta lista são sobre um gate medindo a coisa errada; este é sobre nenhum gate ter existido para medir a coisa nenhuma.
+- **Mitigação aplicada**: o `Dockerfile` foi reestruturado em estágios compartilhados (`build`, `deps`, `runtime-base`) com dois estágios finais nomeados, `runtime-api` e `runtime-workers` — `docker build --target <nome>` escolhe qual sobe; sem a flag, o Docker constrói o último estágio, e por isso `runtime-api` fica por último (a primeira versão desta correção inverteu a ordem — ver a entrada da revisão pré-merge acima). O `container` job da esteira passou a rodar em matriz, construindo e varrendo os dois alvos.
+- **Regra nova**: **todo serviço com processo próprio (`main()`, ponto de entrada, Dockerfile `CMD`) tem uma imagem de contêiner correspondente construída e varrida na esteira** — não basta compilar e testar. A pergunta que teria pego isto mais cedo: "se eu fosse implantar este serviço hoje, que imagem eu usaria?".
+- **Referência**: `Dockerfile`, `.github/workflows/ci.yml` (job `container`), `charts/workers/`.
+
+### 2026-09-24 — `Promise.resolve(fn())` deixa escapar um `throw` síncrono dentro de `fn`
+
+- **Sintoma**: `tests/worker-probes.test.ts` travou em "Test timed out in 5000ms" ao testar uma rota de probe cuja função de verificação lança de forma síncrona — o teste que existe justamente para provar que a probe nunca derruba o processo.
+- **Causa-raiz**: `createProbeServer` despachava a rota com `Promise.resolve(verificar())`. Isso avalia `verificar()` **imediatamente**, fora de qualquer `.then`/`.catch` — o `Promise.resolve` só embrulha o valor de retorno, não a chamada. Um `throw` síncrono dentro de `verificar` propaga como exceção não tratada no listener HTTP, e a requisição nunca recebe resposta.
+- **Por que é grave além do incidente**: a probe HTTP é o único canal pelo qual o Kubernetes decide se um pod está vivo. Uma verificação que trava a resposta em vez de responder 503 tem o efeito oposto do pretendido — o kubelet para de saber a diferença entre "processando devagar" e "morto", exatamente no caminho que deveria ser a rede de segurança.
+- **Mitigação aplicada**: trocado para `Promise.resolve().then(verificar)`, que encadeia a chamada **dentro** da promise, de modo que qualquer exceção síncrona ou assíncrona chegue ao `.catch()` que responde 500.
+- **Regra nova**: **`Promise.resolve(fn())` e `Promise.resolve().then(fn)` não são equivalentes quando `fn` pode lançar de forma síncrona** — só a segunda forma captura o lançamento. Vale para qualquer despachante de callback potencialmente não confiável (rota HTTP, handler de fila, listener de evento). Provado por mutação: reverter a correção reproduz o timeout exato.
+- **Referência**: `src/workers/src/probes.ts`, `tests/worker-probes.test.ts`.
+
+### 2026-09-24 — `cd DIR && CMD &` backgrounda o subshell, não o processo — `$!` mente
+
+- **Sintoma**: ao verificar manualmente o encerramento gracioso do worker fora do Vitest, `kill -TERM "$!"` não encerrou o processo Node — os logs continuaram mostrando lotes sendo consumidos depois do sinal, e uma segunda tentativa na mesma porta reprovou com `EADDRINUSE`.
+- **Causa-raiz**: `cd DIR && ENV=v node script &` backgrounda o **comando composto inteiro** como um único job de subshell; `$!` captura o PID **desse subshell**, não o do `node` que ele acaba executando. `kill -TERM "$!"` matou o wrapper do `cd && node`, e o `node` sobreviveu como órfão, sem nunca receber SIGTERM.
+- **Por que é grave além do incidente**: o defeito apareceu durante a verificação manual da imagem `runtime-workers`, feita sem `docker` disponível no ambiente. `cd X && CMD &` parece inofensivo e não é: qualquer verificação de sinal que use essa forma mede o processo errado — e o resultado errado parece um bug da aplicação, não do teste.
+- **Mitigação aplicada**: a verificação manual passou a usar `env -C DIR VAR=val node script &` — sem `cd`, sem `&&` — de modo que `$!` seja o PID real do `node`. Confirmado com `ps -o pid,ppid,cmd -p $PID` antes de reenviar o sinal.
+- **Regra nova**: **`$!` só é confiável quando o comando backgrounded é um processo único, não uma sequência `A && B &`.** Nenhum script do repositório usava a forma perigosa — esta entrada existe para que a próxima verificação manual (ou o próximo script) não reintroduza o mesmo erro.
+- **Referência**: `docs/PLAYBOOKS/INCIDENTS_LEARNING.md` (entrada de 2026-09-22, mesma classe), `charts/workers/`.
+
+### 2026-09-24 — `tsc --build` não limpa `dist/` órfão depois de um `git mv`
+
+- **Sintoma**: uma verificação manual do layout de runtime do worker (sem `docker`, ver entrada acima) incluiu, por um momento, um `src/api/dist/health.js` que já não tinha `src/api/src/health.ts` correspondente — o arquivo havia sido movido para `src/shared/src/health.ts` para ficar acessível aos dois serviços.
+- **Causa-raiz**: `tsc --build` é incremental e some com o arquivo de saída só quando reconstrói o **mesmo** projeto que o gerou; quando o fonte muda de projeto (`src/api` → `src/shared`) via `git mv`, o `dist/` antigo não é referenciado pelo grafo de build novo e por isso não é candidato a remoção — ele simplesmente fica.
+- **Por que não é risco no CI nem no repositório**: `dist/` está no `.gitignore` em todo pacote, e o runner da esteira sempre parte de um checkout limpo — não existe `dist/` órfão para herdar. O risco é puramente local: uma verificação manual feita sobre um `dist/` não limpo pode incluir um artefato que já não corresponde a nenhum fonte, e ler resultado dela como se fosse o comportamento real do build.
+- **Mitigação aplicada**: a verificação manual passou a rodar `tsc --build --force` (ou remover todo `src/*/dist` primeiro) sempre que um `git mv` mexeu em qual projeto compila qual fonte, antes de confiar no layout resultante.
+- **Regra nova**: **depois de mover um arquivo-fonte entre projetos do `tsc --build`, o `dist/` velho não é limpo automaticamente — force a reconstrução antes de inspecionar a saída localmente.** Não vira gate de CI porque o CI já não tem esse estado para herdar; fica registrado para a próxima pessoa que for depurar um `dist/` local e ficar intrigada com um arquivo que não deveria estar lá.
+- **Referência**: `src/shared/src/health.ts` (movido de `src/api/src/health.ts`).
+
+---
+
 ### 2026-09-22 — Gate de contrato de API aprovaria sempre, comparando documento vazio com documento vazio
 
 - **Sintoma**: ao inspecionar o `openapi.json` recém-gerado, o documento não continha **nenhuma** rota — ainda que as quatro estivessem registradas e respondendo nos testes.

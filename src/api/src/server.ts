@@ -8,10 +8,15 @@ import {
   type ZodTypeProvider,
 } from "fastify-type-provider-zod";
 import { Pool } from "pg";
-import { withRequestContext, type RequestContext } from "@ifix/shared";
+import {
+  checkLiveness,
+  checkReadiness,
+  checkStartup,
+  withRequestContext,
+  type RequestContext,
+} from "@ifix/shared";
 import { AuthError, extractBearerToken, extractTraceId, verifyClaims } from "./auth.js";
 import type { Config } from "./config.js";
-import { checkLiveness, checkReadiness, checkStartup } from "./health.js";
 import { errorSchema, personListSchema, probeResponseSchema } from "./routes/schemas.js";
 
 declare module "fastify" {

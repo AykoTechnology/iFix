@@ -1,0 +1,23 @@
+iFix API implantado como "{{ include "ifix-api.fullname" . }}" no namespace {{ .Release.Namespace }}.
+
+Verifique o rollout:
+  kubectl -n {{ .Release.Namespace }} rollout status deployment/{{ include "ifix-api.fullname" . }}
+
+Encaminhe a porta para testar localmente:
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "ifix-api.fullname" . }} {{ .Values.service.port }}:{{ .Values.service.port }}
+  curl http://localhost:{{ .Values.service.port }}/health/ready
+
+{{- range .Values.envFrom }}
+{{- with .secretRef }}
+
+Este chart não cria o Secret "{{ .name }}" referenciado por envFrom — ele precisa
+existir no namespace antes da instalação (Épico 12.6: origem única de segredos,
+nunca gerada pelo chart).
+{{- end }}
+{{- end }}
+{{- if .Values.autoscaling.enabled }}
+
+Autoscaling habilitado: {{ .Values.autoscaling.minReplicas }}–{{ .Values.autoscaling.maxReplicas }} réplicas
+por CPU/memória. Acompanhe com:
+  kubectl -n {{ .Release.Namespace }} get hpa {{ include "ifix-api.fullname" . }}
+{{- end }}

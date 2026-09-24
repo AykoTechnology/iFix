@@ -28,6 +28,8 @@
     "tokens": "node design-system/build.mjs",
     "tokens:check": "node design-system/build.mjs --check",
     "design:literals": "node scripts/check-design-literals.mjs",
+    "helm:lint": "helm lint charts/api && helm lint charts/workers",
+    "helm:security": "node scripts/check-helm-security.mjs",
     "storybook": "storybook dev -p 6006",
     "storybook:build": "storybook build"
   },
@@ -45,6 +47,7 @@
     "axe-core": "^4.13.0",
     "eslint": "^9.37.0",
     "globals": "^16.4.0",
+    "js-yaml": "^5.4.2",
     "jsdom": "^26.1.0",
     "prettier": "^3.6.2",
     "react": "^19.3.0",

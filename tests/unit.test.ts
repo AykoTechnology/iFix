@@ -2,7 +2,8 @@ import { Pool } from "pg";
 import { afterAll, describe, expect, it } from "vitest";
 import { AuthError, extractBearerToken, extractTraceId } from "../src/api/src/auth.js";
 import { loadConfig } from "../src/api/src/config.js";
-import { checkLiveness, checkReadiness, checkStartup } from "../src/api/src/health.js";
+import { loadConfig as loadWorkerConfig } from "../src/workers/src/config.js";
+import { checkLiveness, checkReadiness, checkStartup } from "../src/shared/src/health.js";
 
 /**
  * Caminhos de falha das funções de borda.
@@ -38,6 +39,18 @@ describe("loadConfig", () => {
 
   it("recusa porta inválida em vez de cair no padrão silenciosamente", () => {
     expect(() => loadConfig({ ...BASE_ENV, PORT: "não-é-número" })).toThrow(/PORT/);
+  });
+});
+
+describe("loadConfig do worker", () => {
+  it("aplica os padrões, com porta de probe distinta da API", () => {
+    const config = loadWorkerConfig({ PGPASSWORD: "x" });
+    expect(config.PROBE_PORT).toBe(3001);
+    expect(config.SHUTDOWN_TIMEOUT_MS).toBeLessThan(30_000);
+  });
+
+  it("recusa PG_POOL_MAX inválido em vez de cair no padrão silenciosamente", () => {
+    expect(() => loadWorkerConfig({ PGPASSWORD: "x", PG_POOL_MAX: "0" })).toThrow(/PG_POOL_MAX/);
   });
 });
 

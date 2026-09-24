@@ -1,0 +1,124 @@
+# Valores do chart dos workers. O securityContext do Pod e do contêiner NÃO é
+# exposto aqui de propósito — mesma justificativa do chart do api (ver
+# charts/api/values.yaml): PodSecurityStandards Restricted e a imutabilidade
+# Distroless são invariante do produto, não parâmetro de ambiente.
+
+image:
+  repository: ifix-workers
+  # Vazio usa .Chart.AppVersion — mesma convenção do chart do api.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+# Só tem efeito com keda.enabled: false — com o KEDA ligado (padrão), o
+# ScaledObject cria o HPA que decide o número de réplicas, e fixar `replicas`
+# no Deployment entraria em conflito com ele a cada reconciliação.
+replicaCount: 1
+
+# Porta onde as três probes do worker respondem (`src/workers/src/probes.ts`).
+# Não é porta de negócio: o worker não serve HTTP para o usuário final, e por
+# isso este chart não cria Service — o kubelet fala com as probes direto no
+# IP do pod, como faz com qualquer probe HTTP.
+probePort: 3001
+
+probes:
+  # Os três caminhos precisam bater com as rotas de `src/workers/src/probes.ts`;
+  # `tests/deploy-invariants.test.ts` compara os dois e reprova a divergência.
+  liveness:
+    path: /health/live
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 2
+    failureThreshold: 3
+  readiness:
+    path: /health/ready
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 2
+    failureThreshold: 3
+  startup:
+    path: /health/startup
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 30
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    # Sem limite de CPU de propósito — mesma razão do chart do api: throttling
+    # sob rajada é pior que o custo de um nó com capacidade ociosa reservada.
+    memory: 256Mi
+
+# Orçamento de encerramento (Regra de Ouro 8): shutdownTimeoutMs + margem (≥ 2s) ≤ 30s,
+# verificado pelo gate 11 e injetado como SHUTDOWN_TIMEOUT_MS no contêiner.
+#
+# Sem preStop, de propósito. No chart do api o preStop existe para o endpoint sair do
+# Service antes do SIGTERM — tráfego EMPURRADO para o pod. O worker PUXA trabalho da
+# fila: nada roteia para ele, então não há o que esperar sair. Pior, durante a pausa
+# o processo ainda não recebeu SIGTERM e segue puxando lotes novos, comendo o prazo
+# de drenagem. O SIGTERM direto já faz a coisa certa: o laço para de ler a fila e só
+# termina o lote corrente (`src/workers/src/index.ts`).
+shutdownTimeoutMs: 25000
+
+# Autoscaling por comprimento de fila (KEDA), não HPA de CPU/memória: o custo
+# de processar uma notificação não escala com o tráfego HTTP de ninguém, e sim
+# com quantas mensagens estão esperando — CPU do worker ocioso não diz nada
+# sobre atraso de entrega.
+keda:
+  enabled: true
+  minReplicaCount: 1
+  maxReplicaCount: 10
+  # Em segundos. 15s (metade do padrão do KEDA) porque uma notificação
+  # atrasada é visível para quem a espera, e o custo de perguntar ao banco a
+  # mais é uma única contagem, não uma varredura de tabela.
+  pollingInterval: 15
+  # 300s (padrão do KEDA): evita reduzir e voltar a aumentar réplicas a cada
+  # oscilação de fila de segundos, sem seguir tão devagar a ponto de a fila
+  # esvaziar muito antes do número de réplicas acompanhar.
+  cooldownPeriod: 300
+  # Mensagens visíveis (prontas para consumo — `vt <= now()`, não as que estão
+  # em voo dentro do timeout de visibilidade) por réplica antes de escalar. O
+  # HPA por baixo do KEDA calcula réplicas como teto(métrica / este valor).
+  targetQueryValue: 5
+  query: "select count(*) from pgmq.q_notifications where vt <= now()"
+  # "require" por padrão: um chart existe para rodar em cluster, e o padrão inseguro
+  # seria o que sobra quando alguém esquece de sobrescrever. Só um Postgres local sem
+  # TLS justifica "disable", e isso vai num values de desenvolvimento, explicitamente.
+  sslmode: require
+
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+  # Desligado por padrão: um PDB com minAvailable >= 1 impede o KEDA de
+  # reduzir para 0 réplicas quando a fila esvazia. Uma disrupção voluntária no
+  # meio de um lote não perde a mensagem — ela reaparece após o timeout de
+  # visibilidade, e a idempotência do consumidor (Regra de Ouro) absorve a
+  # reentrega. Ligar só faz sentido com minReplicaCount >= 1 fixo.
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+# Segredos e configuração vêm de fora do chart (Épico 12.6 — origem única de
+# segredos): o chart só referencia nomes, nunca gera Secret nem ConfigMap com
+# valor. Mesmo Secret de onde o TriggerAuthentication do KEDA lê a credencial
+# de banco — nunca uma cópia separada, que divergiria da credencial real do
+# processo mais cedo ou mais tarde.
+envFrom:
+  - secretRef:
+      name: ifix-workers-env
+extraEnv: []
+
+databaseSecret:
+  name: ifix-workers-env
+  hostKey: PGHOST
+  portKey: PGPORT
+  userNameKey: PGUSER
+  dbNameKey: PGDATABASE
+  passwordKey: PGPASSWORD
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

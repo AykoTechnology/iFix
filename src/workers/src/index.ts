@@ -1,8 +1,11 @@
 import { Pool } from "pg";
+import { loadConfig } from "./config.js";
 import { consumeBatch, type ConsumerOptions, type Handler } from "./consumer.js";
+import { createProbeServer } from "./probes.js";
 
 /**
- * Processo do worker de notificações.
+ * Processo do worker de notificações. PID 1 na imagem Distroless (ADR-001): sem
+ * supervisor nem shell, o próprio processo trata os sinais do sistema operacional.
  *
  * ## Por que o SIGTERM espera o lote terminar
  *
@@ -22,42 +25,70 @@ const CONFIG: ConsumerOptions = {
   deadLetterQueue: "notifications_dlq",
 };
 
-/** Intervalo entre lotes quando a fila está vazia. */
-const OCIOSO_MS = Number(process.env.WORKER_IDLE_MS ?? 1_000);
-
 const handler: Handler = async (envelope) => {
   // O roteamento por canal (e-mail, push, in-app) é a História 10.1 e depende do R5,
   // que define o provedor. Até lá o consumidor exerce o padrão completo — envelope
   // validado, contexto de locatário aplicado, idempotência registrada — sem inventar
   // um destino que ainda não foi decidido.
   process.stdout.write(
-    `${JSON.stringify({ level: "info", msg: "evento consumido", event_type: envelope.event_type, event_id: envelope.event_id, trace_id: envelope.trace_id })}\n`,
+    `${JSON.stringify({
+      level: "info",
+      msg: "evento consumido",
+      event_type: envelope.event_type,
+      event_id: envelope.event_id,
+      trace_id: envelope.trace_id,
+    })}\n`,
   );
   return Promise.resolve();
 };
 
 async function main(): Promise<void> {
+  const config = loadConfig();
+
   const pool = new Pool({
-    host: process.env.PGHOST,
-    port: Number(process.env.PGPORT ?? 5432),
-    database: process.env.PGDATABASE,
-    user: process.env.PGUSER,
-    password: process.env.PGPASSWORD,
-    max: Number(process.env.PG_POOL_MAX ?? 4),
+    host: config.PGHOST,
+    port: config.PGPORT,
+    database: config.PGDATABASE,
+    user: config.PGUSER,
+    password: config.PGPASSWORD,
+    max: config.PG_POOL_MAX,
   });
+
+  const probes = createProbeServer(pool, config.EVENT_LOOP_LAG_THRESHOLD_MS);
+  await new Promise<void>((resolve) =>
+    probes.listen(config.PROBE_PORT, config.PROBE_HOST, resolve),
+  );
 
   let encerrando = false;
-  const encerrar = (sinal: string): void => {
-    process.stdout.write(`${JSON.stringify({ level: "info", msg: "encerrando", sinal })}\n`);
+  let guard: NodeJS.Timeout | undefined;
+
+  const encerrar = (sinal: NodeJS.Signals): void => {
+    // Sinal repetido durante a drenagem é ignorado: um segundo SIGTERM não deve
+    // abortar o encerramento ordenado que já está em curso.
+    if (encerrando) return;
     encerrando = true;
+
+    process.stdout.write(
+      `${JSON.stringify({ level: "info", msg: "encerrando: drenando lote atual", sinal })}\n`,
+    );
+
+    // Rede de segurança: se o lote corrente travar, sair antes do SIGKILL do
+    // Kubernetes é preferível a ser morto no meio dele (Regra de Ouro 8).
+    guard = setTimeout(() => {
+      process.stderr.write(
+        `${JSON.stringify({
+          level: "error",
+          msg: "drenagem excedeu o prazo",
+          timeoutMs: config.SHUTDOWN_TIMEOUT_MS,
+        })}\n`,
+      );
+      process.exit(1);
+    }, config.SHUTDOWN_TIMEOUT_MS);
+    guard.unref();
   };
 
-  process.on("SIGTERM", () => {
-    encerrar("SIGTERM");
-  });
-  process.on("SIGINT", () => {
-    encerrar("SIGINT");
-  });
+  process.on("SIGTERM", encerrar);
+  process.on("SIGINT", encerrar);
 
   while (!encerrando) {
     const resultado = await consumeBatch(pool, CONFIG, handler);
@@ -66,17 +97,30 @@ async function main(): Promise<void> {
       // Mensagem na DLQ é automação de negócio que silenciosamente não aconteceu
       // (Épico 12.5). Sai como erro para que o alerta tenha o que observar.
       process.stderr.write(
-        `${JSON.stringify({ level: "error", msg: "mensagens na DLQ", quantidade: resultado.deadLettered, fila: CONFIG.deadLetterQueue })}\n`,
+        `${JSON.stringify({
+          level: "error",
+          msg: "mensagens na DLQ",
+          quantidade: resultado.deadLettered,
+          fila: CONFIG.deadLetterQueue,
+        })}\n`,
       );
     }
 
     // Só dorme quando não havia nada: com fila cheia, o próximo lote sai imediatamente.
-    if (resultado.processed + resultado.duplicates + resultado.failed === 0) {
-      await new Promise((resolve) => setTimeout(resolve, OCIOSO_MS));
+    if (!encerrando && resultado.processed + resultado.duplicates + resultado.failed === 0) {
+      await new Promise((resolve) => setTimeout(resolve, config.WORKER_IDLE_MS));
     }
   }
 
+  clearTimeout(guard);
+  await new Promise<void>((resolve) => probes.close(() => resolve()));
   await pool.end();
+
+  process.stdout.write(`${JSON.stringify({ level: "info", msg: "encerrado com sucesso" })}\n`);
+  process.exit(0);
 }
 
-await main();
+main().catch((error: unknown) => {
+  process.stderr.write(`falha na inicialização: ${String(error)}\n`);
+  process.exit(1);
+});

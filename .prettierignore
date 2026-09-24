@@ -9,3 +9,9 @@ package-lock.json
 docs/ADR/
 docs/api/openapi.json
 design-system/dist/
+
+# `{{ }}` é sintaxe do motor de templates do Helm, não YAML — o parser do Prettier
+# rejeita como erro de sintaxe o que para o `helm template` é perfeitamente válido.
+# `Chart.yaml` e `values.yaml` continuam formatados normalmente: só `templates/`
+# mistura os dois idiomas.
+charts/*/templates/

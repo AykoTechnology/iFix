@@ -1,0 +1,10 @@
+apiVersion: v2
+name: ifix-api
+description: Serviço HTTP do iFix (src/api) — Fastify sobre Node 22 em Distroless.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+# >=1.30.0-0 porque o preStop usa o lifecycle handler nativo `sleep` (Beta na 1.30,
+# habilitado por padrão) — a imagem Distroless não tem `/bin/sleep` para um preStop
+# via exec, e não há como fazer diagnóstico "depois" numa imagem sem shell (ADR-001).
+kubeVersion: ">=1.30.0-0"

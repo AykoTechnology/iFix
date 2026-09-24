@@ -1,0 +1,17 @@
+{{- if .Values.podDisruptionBudget.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "ifix-api.fullname" . }}
+  labels:
+    {{- include "ifix-api.labels" . | nindent 4 }}
+spec:
+  # minAvailable, não maxUnavailable: com replicaCount tão baixo quanto 2, um
+  # maxUnavailable fixo em número absoluto poderia liberar os dois pods de uma vez
+  # sob certas contas de porcentagem — minAvailable é o que garante que sempre sobra
+  # pelo menos um pod servindo durante um drain voluntário de nó.
+  minAvailable: {{ .Values.podDisruptionBudget.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "ifix-api.selectorLabels" . | nindent 6 }}
+{{- end }}

@@ -1,0 +1,25 @@
+{{- if .Values.keda.enabled }}
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: {{ include "ifix-workers.fullname" . }}
+  labels:
+    {{- include "ifix-workers.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    name: {{ include "ifix-workers.fullname" . }}
+  minReplicaCount: {{ .Values.keda.minReplicaCount }}
+  maxReplicaCount: {{ .Values.keda.maxReplicaCount }}
+  pollingInterval: {{ .Values.keda.pollingInterval }}
+  cooldownPeriod: {{ .Values.keda.cooldownPeriod }}
+  triggers:
+    - type: postgresql
+      authenticationRef:
+        name: {{ include "ifix-workers.fullname" . }}-pg
+      metadata:
+        # host/port/userName/dbName/password vêm do TriggerAuthentication
+        # acima — só o que não é credencial fica aqui, em texto puro.
+        sslmode: {{ .Values.keda.sslmode | quote }}
+        query: {{ .Values.keda.query | quote }}
+        targetQueryValue: {{ .Values.keda.targetQueryValue | quote }}
+{{- end }}

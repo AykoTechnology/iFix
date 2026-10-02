@@ -2,10 +2,13 @@
 /**
  * Compila `/design-system/tokens.json` nos artefatos de UI — história 11.2, ADR-011.
  *
- * Saídas, ambas em `design-system/dist/` e ambas versionadas:
+ * Saídas, todas em `design-system/dist/` e todas versionadas:
  *
  *   tokens.css          variáveis CSS nativas, exigidas explicitamente pelo ADR-011
  *   tailwind-theme.js   extensão de tema do Tailwind, apontando para essas variáveis
+ *   fonts.css           `@font-face` das fontes servidas pela aplicação (história 11.6),
+ *                       gerado de `design-system/fonts/manifest.json` — e só depois de
+ *                       conferir que arquivos, hashes e famílias batem com os tokens
  *
  * O Tailwind aponta para `var(--…)` em vez de receber o hexadecimal direto. É o que
  * torna a troca de tema uma troca de atributo no `<html>`, e não uma recompilação:
@@ -20,6 +23,7 @@ import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import StyleDictionary from "style-dictionary";
+import { gerarFontsCss, validarFontes } from "./fonts.mjs";
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
 const RAIZ = resolve(AQUI, "..");
@@ -300,6 +304,31 @@ for (const arquivo of [
     await fn({ dictionary: plataforma, file: {}, options: {}, platform: {} }),
   );
 }
+
+// As fontes não passam pelo Style Dictionary: não são tokens, são arquivos. O que o
+// SD compila (`font.family.*`) só nomeia a família; quem garante que o nome resolve
+// para um arquivo real, íntegro e licenciado é esta validação.
+const FONTES = resolve(AQUI, "fonts");
+const manifesto = JSON.parse(readFileSync(resolve(FONTES, "manifest.json"), "utf8"));
+const problemasDeFontes = validarFontes({
+  tokens: ARVORE,
+  manifesto,
+  ler: (arquivo) => {
+    try {
+      return readFileSync(resolve(FONTES, arquivo));
+    } catch {
+      return null;
+    }
+  },
+});
+
+if (problemasDeFontes.length > 0) {
+  console.error("Gate 10 — fontes inconsistentes com tokens.json (ADR-020):\n");
+  for (const problema of problemasDeFontes) console.error(`  ${problema}`);
+  process.exit(1);
+}
+
+gerados.set("fonts.css", gerarFontsCss({ manifesto, cabecalho: cabecalhoCss() }));
 
 if (conferir) {
   const divergentes = [];

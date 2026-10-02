@@ -4,17 +4,20 @@ Este diretório contém o **artefato compilável** do design system (ADR-011). A
 
 ## Conteúdo
 
-| Arquivo                                               | Papel                                                                                                                                                                  |
-| ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `tokens.json`                                         | Todos os valores estéticos da interface, no formato **DTCG** (`$value`/`$type`). Fonte única — nenhum valor de cor, espaçamento, raio ou tipografia existe fora daqui. |
-| _(a criar — Épico 11.2)_ `style-dictionary.config.js` | Configuração do pipeline de compilação                                                                                                                                 |
-| _(gerado — não versionar edições manuais)_ `build/`   | Saídas: `tailwind.tokens.js`, `variables.css`                                                                                                                          |
+| Arquivo            | Papel                                                                                                                                                                  |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tokens.json`      | Todos os valores estéticos da interface, no formato **DTCG** (`$value`/`$type`). Fonte única — nenhum valor de cor, espaçamento, raio ou tipografia existe fora daqui. |
+| `build.mjs`        | Compilador (Style Dictionary v4). `npm run tokens` gera; `npm run tokens:check` reprova se `dist/` divergir — metade "drift" do gate 10.                               |
+| `dist/` _(gerado)_ | `tokens.css`, `tailwind-theme.js` e `fonts.css`. Versionados e **nunca editados à mão**.                                                                               |
+| `fonts/`           | Os WOFF2 servidos pela aplicação, as licenças (SIL OFL) e `manifest.json` — proveniência, SHA-256 e faixas Unicode de cada arquivo.                                    |
+| `fonts.mjs`        | Valida o manifesto contra os tokens e gera o `@font-face`. Função pura, testada com manifestos adulterados em `tests/fonts.test.ts`.                                   |
 
 ## Pipeline
 
 ```
-tokens.json  ──(Style Dictionary)──┬──▶ build/tailwind.tokens.js  ──▶ src/web/tailwind.config.ts
-                                   └──▶ build/variables.css       ──▶ :root e [data-theme="light"]
+tokens.json ──(Style Dictionary)──┬──▶ dist/tokens.css          variáveis em :root e [data-theme="light"]
+                                  └──▶ dist/tailwind-theme.js   ──▶ src/web/tailwind.config.ts ──▶ utilitários
+fonts/manifest.json ──(fonts.mjs)────▶ dist/fonts.css           @font-face ──▶ fonts/*.woff2
 ```
 
 O pipeline roda no build e na esteira de CI. **A saída não é editada manualmente** — alteração de design entra por `tokens.json` e se propaga.
@@ -49,6 +52,16 @@ O design system original especificava Gilroy e Lufga, famílias comerciais. A an
 3. `font.family.display` e `font.family.body` permanecem **tokens distintos**, ambos resolvendo para Outfit. Reintroduzir uma família de display é troca de valor, não refatoração de componente.
 4. A hierarquia vem de **tamanho e peso** (`font.size`, `font.weight`), não de contraste entre famílias. Se faltar contraste entre título e corpo, a correção é na escala — nunca em valor literal no componente.
 
-### A verificar na implementação (Épico 11.6)
+### Como as fontes são servidas (Épico 11.6)
 
-Se a Outfit oferece numerais tabulares. A fila de chamados alinha tempos de SLA e contagens em coluna; sem `tnum`, aplicar `font-variant-numeric: tabular-nums` e validar no componente de tabela.
+Quatro arquivos WOFF2 **variáveis** (um por família e subconjunto, ~103 KB no total) cobrem todos os pesos dos tokens (300 a 700) — duas famílias de quatro pesos estáticos seriam o dobro de arquivos. São as distribuições **não modificadas** dos pacotes Fontsource (as mesmas do Google Fonts), em `design-system/fonts/`, com a licença de cada família ao lado e o SHA-256 de cada arquivo no manifesto.
+
+- **`@font-face` gerado, nunca escrito à mão.** `npm run tokens` valida e gera `dist/fonts.css`. A validação reprova arquivo ausente, trocado ou que não é WOFF2; família nos tokens sem arquivo (e o inverso); subconjunto ou eixo de peso que não cobre os tokens; licença ausente; e qualquer caminho que não seja local.
+- **`font-display: swap`** em todo `@font-face`, e `unicode-range` por subconjunto: o navegador só baixa o `latin-ext` se houver texto que o exija.
+- **Nenhuma referência externa.** `tests/fonts.test.ts` varre a interface, a vitrine e os artefatos compilados atrás de `url()`, `@import`, `<link>` e `<script>` com URL absoluta — pela forma, e não por uma lista de domínios.
+- **Preload da fonte de corpo.** O manifesto marca o arquivo (`outfit-latin-wght-normal.woff2`). O shell da aplicação precisa de `<link rel="preload" as="font" type="font/woff2" crossorigin href="…">` para ele — `crossorigin` é obrigatório mesmo na mesma origem, ou o navegador baixa duas vezes. Ainda não há `src/web/index.html`; quando houver, o teste correspondente deixa de ser pulado e exige o preload.
+- **Atualizar uma fonte:** baixar o pacote novo (`npm pack @fontsource-variable/outfit`), copiar os WOFF2 e a licença para `fonts/`, atualizar versão, SHA-256 e `unicodeRange` no manifesto e rodar `npm run tokens`. A troca de arquivo sem atualizar o manifesto reprova.
+
+### Numerais tabulares (resolvido)
+
+**A Outfit oferece `tnum`**, mas os dígitos são **proporcionais por padrão** (de 321 a 659 unidades de largura; com `tnum`, os dez passam a 590, inclusive em peso 700). Tempos de SLA e contagens em coluna precisam, portanto, de `font-variant-numeric: tabular-nums` — a utilitária `tabular-nums` do Tailwind, que não é valor estético e passa pelo gate 10. Medido num Chromium real: "1111" e "0000" a 32 px medem 44,4 e 84,0 px sem `tabular-nums` e 75,5 e 75,5 px com ele. A **JetBrains Mono** é monoespaçada (dígitos todos com 600) e não precisa de nada. `tests/fonts.test.ts` lê a tabela `GSUB` do arquivo versionado e exige `tnum` na Outfit: uma troca por versão sem a feature desalinharia a coluna sem erro algum.

@@ -4,6 +4,12 @@ import type { Preview } from "@storybook/react-vite";
 // as próprias cores validaria uma interface que não existe (ADR-011).
 import "../design-system/dist/tokens.css";
 
+// As fontes servidas pela própria aplicação (ADR-020, história 11.6): o `@font-face`
+// aponta para os WOFF2 versionados em `design-system/fonts/`. Sem este import, os
+// tokens `font-family-*` nomeariam uma fonte que o navegador nunca carregou — e a
+// vitrine renderizaria `system-ui` aprovando uma interface que não é a de produção.
+import "../design-system/dist/fonts.css";
+
 const preview: Preview = {
   parameters: {
     // O painel do Axe fica visível durante o desenvolvimento; o bloqueio de merge é

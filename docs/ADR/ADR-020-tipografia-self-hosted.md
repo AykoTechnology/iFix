@@ -24,7 +24,8 @@
   - A renderização deixa de depender do que está instalado na máquina de quem olha. Passa a ser **determinística para todos**, o que é pré-requisito para revisão de UI confiável, para testes visuais e para a validação de contraste da esteira (Épico 11.4).
   - A hierarquia tipográfica passa a ser construída por **tamanho e peso**, não por contraste entre duas famílias. A escala de `font.size`/`font.weight` já sustenta isso; se o design concluir que falta contraste entre título e corpo, a correção é na escala ou na reintrodução de uma família de display, nunca em valor literal no componente (ADR-011).
   - **Precedente que extrapola tipografia:** nenhum recurso estático de terceiros é consumido de CDN externo em tempo de execução. Vale para fontes, ícones e bibliotecas de frontend.
-  - A verificar na implementação (Épico 11.6): se a Outfit oferece numerais tabulares. A fila de chamados alinha tempos de SLA e contagens em coluna; sem `tnum` disponível, aplicar `font-variant-numeric: tabular-nums` e validar o resultado no componente de tabela.
+  - `[+]` **Numerais tabulares (verificado na implementação, Épico 11.6):** a Outfit oferece `tnum`, mas seus dígitos são proporcionais por padrão. Tempos de SLA e contagens alinhados em coluna usam `font-variant-numeric: tabular-nums`; a JetBrains Mono é monoespaçada e não precisa. Uma suíte automatizada lê a feature `tnum` do arquivo versionado, para que uma troca de fonte sem ela não desalinhe a coluna em silêncio.
+  - `[+]` **Fontes variáveis, não estáticas:** um arquivo WOFF2 variável por família e subconjunto cobre todos os pesos dos tokens. Os arquivos são distribuições não modificadas dos pacotes Fontsource, versionados em `design-system/fonts/` com a licença, a proveniência e o SHA-256 de cada um num manifesto; o `@font-face` é gerado a partir dele e o build reprova divergência.
 
 ---
 

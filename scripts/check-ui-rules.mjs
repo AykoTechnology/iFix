@@ -21,7 +21,7 @@
 
 import { createServer } from "node:http";
 import { existsSync, readFileSync, statSync } from "node:fs";
-import { dirname, extname, join, resolve } from "node:path";
+import { dirname, extname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright-core";
 import { analisarRegras, coletarElementos } from "./ui-rules.mjs";
@@ -59,9 +59,15 @@ const historias = Object.values(
 if (historias.length === 0) falhar("nenhuma história encontrada em index.json");
 
 const servidor = createServer((req, res) => {
-  let caminho = join(ESTATICO, decodeURIComponent(req.url.split("?")[0]));
+  let caminho = resolve(ESTATICO, `.${decodeURIComponent(req.url.split("?")[0])}`);
+  // A contenção é checada ANTES de qualquer acesso ao disco, e com o separador para
+  // não aceitar um diretório irmão de mesmo prefixo (`storybook-static-x`).
+  if (caminho !== ESTATICO && !caminho.startsWith(ESTATICO + sep)) {
+    res.writeHead(404).end();
+    return;
+  }
   if (existsSync(caminho) && statSync(caminho).isDirectory()) caminho = join(caminho, "index.html");
-  if (!caminho.startsWith(ESTATICO) || !existsSync(caminho)) {
+  if (!existsSync(caminho)) {
     res.writeHead(404).end();
     return;
   }

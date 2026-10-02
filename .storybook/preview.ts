@@ -10,6 +10,11 @@ import "../design-system/dist/tokens.css";
 // vitrine renderizaria `system-ui` aprovando uma interface que não é a de produção.
 import "../design-system/dist/fonts.css";
 
+// Os utilitários do Tailwind, derivados dos tokens. É o mesmo arquivo que a aplicação
+// importa: sem ele as classes dos componentes não geram CSS e a vitrine renderiza
+// marcação sem estilo.
+import "../src/web/src/index.css";
+
 const preview: Preview = {
   parameters: {
     // O painel do Axe fica visível durante o desenvolvimento; o bloqueio de merge é

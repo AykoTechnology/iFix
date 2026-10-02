@@ -1,0 +1,12 @@
+/*
+ * Entrada de CSS da interface: os utilitários do Tailwind, resolvidos contra os tokens
+ * (`src/web/tailwind.config.ts` → `design-system/dist/tailwind-theme.js`, ADR-011).
+ *
+ * Sem esta entrada o Tailwind nunca roda: `font-body`, `bg-status-*` e o resto das
+ * classes dos componentes não geram CSS, e a vitrine renderiza marcação sem estilo.
+ * O Storybook importa o mesmo arquivo que a aplicação importará — a vitrine não
+ * valida uma interface diferente da que vai para produção.
+ */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

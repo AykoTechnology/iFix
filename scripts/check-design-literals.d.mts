@@ -9,7 +9,7 @@ export interface ViolacaoDeToken {
   caminho: string;
   linha: number;
   coluna: number;
-  /** Identificador da regra: `hex`, `funcao-de-cor`, `medida`, `utilitaria-arbitraria`. */
+  /** Identificador da regra: `hex`, `funcao-de-cor`, `medida`, `utilitaria-arbitraria`, `classe-interpolada`. */
   regra: string;
   mensagem: string;
   /** O texto exato que disparou a regra. */

@@ -63,6 +63,15 @@ const REGRAS = [
     padrao: /(?<![\w-])[a-z][a-z0-9]*(?:-[a-z0-9]+)*-\[[^\]\s]+\]/g,
     mensagem: "classe utilitária arbitrária do Tailwind",
   },
+  {
+    id: "classe-interpolada",
+    // `bg-status-${estado}-tint`. O Tailwind gera CSS só para classes que enxerga como
+    // texto literal; montada por interpolação, a classe nunca é vista, some do CSS e o
+    // componente fica sem estilo — sem erro, sem aviso. O que se faz no lugar é um mapa
+    // estático de classes completas (ver `StatusChip`).
+    padrao: /(?<![\w-])[a-z][a-z0-9]*(?:-[a-z0-9]+)*-\$\{[^}]+\}/g,
+    mensagem: "classe do Tailwind montada por interpolação — o Tailwind não a enxerga",
+  },
 ];
 
 /**

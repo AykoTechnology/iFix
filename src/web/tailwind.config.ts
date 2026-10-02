@@ -10,7 +10,10 @@ import { ifixTheme } from "../../design-system/dist/tailwind-theme.js";
  * gate 10 reprova qualquer valor estético que não venha daqui.
  */
 export default {
-  content: ["./src/**/*.{ts,tsx}", "../../.storybook/**/*.{ts,tsx}"],
+  // `relative: true`: os globs valem a partir deste arquivo, não de onde o processo roda.
+  // Sem isso, `../../.storybook` resolveria fora do repositório quando o Storybook roda
+  // na raiz, e as classes usadas só nas histórias seriam podadas do CSS.
+  content: { relative: true, files: ["./src/**/*.{ts,tsx}", "../../.storybook/**/*.{ts,tsx}"] },
   // O tema é resolvido por variável CSS, então não há `darkMode: 'class'`: trocar de
   // tema é trocar `data-theme` no <html>, e o Tailwind nem precisa saber.
   theme: { extend: ifixTheme },

@@ -27,6 +27,38 @@ export const ESTADOS = {
 
 export type Estado = keyof typeof ESTADOS;
 
+/**
+ * Classes escritas por extenso, de propósito. O Tailwind só gera o CSS das classes que
+ * enxerga como texto literal no código-fonte: um nome de classe montado por template
+ * (prefixo fixo mais o nome do estado) nunca é visto, some do CSS e o chip fica sem cor
+ * — sem erro, sem aviso e sem teste que perceba (o contraste é medido sobre os tokens,
+ * não sobre o render). O gate 10 reprova interpolação em nome de classe, e
+ * `Record<Estado, …>` obriga a cobrir todo estado novo.
+ */
+const CLASSES_DO_ESTADO: Record<Estado, { chip: string; ponto: string }> = {
+  novo: { chip: "bg-status-novo-tint text-status-novo-text", ponto: "bg-status-novo-dot" },
+  "em-atendimento": {
+    chip: "bg-status-em-atendimento-tint text-status-em-atendimento-text",
+    ponto: "bg-status-em-atendimento-dot",
+  },
+  "aguardando-solicitante": {
+    chip: "bg-status-aguardando-solicitante-tint text-status-aguardando-solicitante-text",
+    ponto: "bg-status-aguardando-solicitante-dot",
+  },
+  resolvido: {
+    chip: "bg-status-resolvido-tint text-status-resolvido-text",
+    ponto: "bg-status-resolvido-dot",
+  },
+  "sla-violado": {
+    chip: "bg-status-sla-violado-tint text-status-sla-violado-text",
+    ponto: "bg-status-sla-violado-dot",
+  },
+  fechado: {
+    chip: "bg-status-fechado-tint text-status-fechado-text",
+    ponto: "bg-status-fechado-dot",
+  },
+};
+
 export interface StatusChipProps {
   estado: Estado;
   /**
@@ -45,10 +77,13 @@ export function StatusChip({ estado, rotulo }: StatusChipProps): React.ReactElem
       className={[
         "inline-flex items-center gap-1 rounded-chip px-2 py-1",
         "font-body text-caption",
-        `bg-status-${estado}-tint text-status-${estado}-text`,
+        CLASSES_DO_ESTADO[estado].chip,
       ].join(" ")}
     >
-      <span aria-hidden="true" className={`h-2 w-2 rounded-pill bg-status-${estado}-dot`} />
+      <span
+        aria-hidden="true"
+        className={`h-2 w-2 rounded-pill ${CLASSES_DO_ESTADO[estado].ponto}`}
+      />
       {conteudo}
     </span>
   );

@@ -21,6 +21,16 @@ describe("o verificador reprova valor estético literal", () => {
     ["medida em rem", `.card { gap: 1.5rem; }`, "medida"],
     ["utilitária arbitrária de cor", `<div className="bg-[#723CEB]" />`, "utilitaria-arbitraria"],
     ["utilitária arbitrária de medida", `<div className="w-[13px]" />`, "utilitaria-arbitraria"],
+    [
+      "classe montada por interpolação",
+      "<span className={`bg-status-${estado}-tint`} />",
+      "classe-interpolada",
+    ],
+    [
+      "classe interpolada em array",
+      `["font-body", \`text-status-\${estado}-text\`]`,
+      "classe-interpolada",
+    ],
   ];
 
   for (const [nome, fonte, regra] of casos) {
@@ -39,6 +49,15 @@ describe("o verificador não reprova o uso correto", () => {
     ["cor de tema por papel", `<span className="text-status-novo-text" />`],
     ["número sem unidade estética", `const limite = 42;`],
     ["identificador com dígitos", `const sha256 = hash();`],
+    [
+      "classe completa escrita por extenso",
+      `{ chip: "bg-status-novo-tint text-status-novo-text" }`,
+    ],
+    ["interpolação fora de nome de classe", "const rotulo = `${estado}: ${total} chamados`;"],
+    [
+      "interpolação separada da classe por espaço",
+      "className={`h-2 w-2 ${CLASSES[estado].ponto}`}",
+    ],
   ];
 
   for (const [nome, fonte] of aceitos) {

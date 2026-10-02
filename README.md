@@ -49,12 +49,12 @@ As 11 Regras de Ouro, cada uma com o gate de CI que a torna mecânica, estão na
 - **API**: servidor Fastify com contexto de requisição aplicado por GUC transacional, três probes distintas e contrato OpenAPI 3.1 derivado do Zod.
 - **Design**: `tokens.json` compilado por Style Dictionary em variáveis CSS e tema do Tailwind, com gate de drift e de literal estético.
 - **Fila**: `notifications` em pgmq com publicação transacional e consumidor idempotente com DLQ; worker com as três probes próprias (`src/workers/src/probes.ts`).
-- **Interface**: Storybook com Axe por história; primeiro componente consumindo os tokens.
+- **Interface**: Storybook com Axe por história, Tailwind ligado aos tokens e fontes Outfit/JetBrains Mono servidas pela própria aplicação (sem CDN); primeiro componente consumindo os tokens.
 - **Empacotamento**: um `Dockerfile` produz `ifix-api` e `ifix-workers`; charts Helm (`charts/api`, `charts/workers`) com PSS Restricted, as três probes, `terminationGracePeriodSeconds: 30`, HPA e autoscaling do worker por comprimento de fila (KEDA).
 - **Esteira**: os 12 gates da § 6.4 ativos; imagens Distroless `nonroot` com varredura Trivy; charts validados por `helm lint`, `kubeconform` e verificador próprio de conformidade estrutural.
 - **Testes**: mais de 220 testes contra PostgreSQL real, incluindo testes estruturais que reprovam qualquer tabela sem RLS forçada.
 
-Pendentes da fase: SDK OpenTelemetry, bloqueado pelo **R6** (destino de exportação); `charts/infra`, que fica só `README.md` até o **R9** (modelo de entrega) decidir onde o Supabase Self-Hosted roda. Ver `docs/CONTEXT.md` § 1.
+Pendentes da fase: SDK OpenTelemetry, **adiado para o fim do projeto** por decisão do dono do produto (depende do **R6**, destino de exportação); `charts/infra`, que fica só `README.md` até o **R9** (modelo de entrega) decidir onde o Supabase Self-Hosted roda. Ver `docs/CONTEXT.md` § 1.
 
 ## Governança de documentação
 

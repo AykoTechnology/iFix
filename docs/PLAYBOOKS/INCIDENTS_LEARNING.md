@@ -18,6 +18,21 @@ Toda entrada nova é adicionada ao **topo** da lista (mais recente primeiro). Ne
 
 ---
 
+### 2026-10-02 — A vitrine nunca renderizou com estilo, e o Axe rodava sobre marcação crua
+
+- **Sintoma**: nenhum na esteira. Descoberto ao tentar provar que as fontes da 11.6 chegavam à tela: num Chromium real, o componente computava `Times New Roman`, e o CSS emitido pelo Storybook tinha **zero** classes utilitárias.
+- **Causas-raiz**:
+  1. **O Tailwind nunca foi ligado.** `tailwindcss` era dependência e `tailwind.config.ts` existia, mas não havia `postcss.config` nem arquivo com `@tailwind` em lugar nenhum. `font-body`, `bg-status-*` e o resto das classes do `StatusChip` não geravam CSS. Carregar a Outfit não mudaria um pixel.
+  2. **As classes de cor eram montadas por interpolação.** Com o Tailwind ligado, ainda faltavam as 18 classes de cor: o Tailwind só gera o que enxerga como texto literal, e um nome montado por template (prefixo fixo mais o estado) nunca é visto. O chip ficaria sem cor também em produção.
+  3. Um defeito a mais, de configuração: o `content` do Tailwind usava `../../.storybook/**`, que só resolve a partir do arquivo de configuração. Rodando na raiz, apontava para fora do repositório.
+- **Por que passou**: o gate 7 roda o Axe em jsdom sobre as histórias, e o contraste é calculado sobre os **tokens** (`tests/design-tokens.test.ts`), não sobre pixels. Ambos estavam corretos e ambos eram cegos a "a classe não gera CSS". É a quinta vez que um gate mede menos do que aparenta, e a primeira em que o objeto verificado — a interface renderizada — nunca tinha sido olhado de verdade.
+- **Mitigação aplicada**: `src/web/src/index.css` e `postcss.config.mjs` ligam o Tailwind, e o `content` passou a `relative: true`. O `StatusChip` usa um mapa estático de classes completas, tipado `Record<Estado, …>`. O gate 10 ganhou a regra `classe-interpolada`, verificada revertendo o componente à interpolação. Provado num Chromium real: fontes em `loaded`, chip com fundo e cor de texto diferentes nos dois temas, zero requisições fora de localhost.
+- **Regras novas**:
+  1. **Todo componente novo é visto renderizado num navegador real ao menos uma vez**, lendo estilo computado — não só DOM nem só teste de acessibilidade. O que o Axe e o jsdom não enxergam (CSS aplicado, fonte carregada) precisa de olho próprio.
+  2. **Nome de classe do Tailwind nunca é montado por interpolação.** Mapa estático de classes completas; o gate 10 reprova o contrário.
+  3. **Mutação só vale depois de confirmada aplicada.** Nesta mesma tarefa uma das quatro mutações era um `sed` com erro de sintaxe: não alterou nada e o teste "passou". Ao provar um gate, conferir que a quebra de fato existe (`grep` no arquivo mutado) antes de ler o resultado.
+- **Referência**: `src/web/src/index.css`, `postcss.config.mjs`, `src/web/src/components/StatusChip.tsx`, `scripts/check-design-literals.mjs`, `tests/fonts.test.ts`, história 11.6 (#11).
+
 ### 2026-09-24 — Doze gates ativos, nenhum bloqueando o merge
 
 - **Sintoma**: nenhum na esteira. Encontrado ao conferir as Issues contra o repositório: a história 11.5 exige "bloqueio de merge", e a `main` não tinha proteção de branch. Qualquer PR com o CI vermelho podia ser mergeado.

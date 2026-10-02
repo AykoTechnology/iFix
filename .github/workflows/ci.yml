@@ -10,7 +10,8 @@ name: CI
 #   ativos    1 (lint/format) · 2 (typecheck) · 3 e 4 (testes + cobertura)
 #             5 (RLS, por teste estrutural) · 6 (drift de OpenAPI)
 #             8 (dependências e segredos) · 9 (imagem + Trivy, api e workers)
-#             7 (Axe por história do Storybook) · 10 (design tokens) · 12 (ADRs)
+#             7 (Axe por história + regras de produto no navegador) · 10 (design tokens)
+#             12 (ADRs)
 #             11 (Helm — helm lint, kubeconform, admissão PSS restricted num
 #                kube-apiserver real, Regra de Ouro 8)
 #   pendentes charts/infra fica de fora do gate 11: ainda é só README, à espera dos
@@ -75,6 +76,14 @@ jobs:
       # ser testada em silêncio, e o gate passaria por ter menos o que verificar.
       - name: Gate 7 — a vitrine do Storybook compila
         run: npm run storybook:build
+
+      # As regras de produto que o Axe não enxerga, medidas no navegador real sobre cada
+      # história renderizada, nos dois temas: alvo mínimo de 44×44 px, cor nunca como
+      # único portador de informação e gradiente da marca limitado a um destaque (11.7).
+      # Usa o Google Chrome que o runner já traz; o `playwright-core` é só o driver.
+      # Roda DEPOIS do build: lê `storybook-static/`.
+      - name: Gate 7 — regras de produto no navegador (11.7)
+        run: npm run ui:rules
 
   testes:
     name: Gates 3, 4 e 5

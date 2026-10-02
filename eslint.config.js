@@ -64,6 +64,14 @@ export default tseslint.config(
   },
 
   {
+    // O coletor de `ui-rules.mjs` é serializado e executado DENTRO da página pelo
+    // Playwright, então enxerga `document` e `getComputedStyle`. A exceção vale só para
+    // os dois arquivos que tocam o navegador — não para os scripts em geral.
+    files: ["scripts/ui-rules.mjs", "scripts/check-ui-rules.mjs"],
+    languageOptions: { globals: { ...globals.node, ...globals.browser } },
+  },
+
+  {
     files: ["**/*.test.ts", "**/*.mjs", "**/*.config.*"],
     rules: {
       "no-console": "off",

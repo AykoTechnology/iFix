@@ -20,8 +20,8 @@
  */
 
 import { createServer } from "node:http";
-import { existsSync, readFileSync, statSync } from "node:fs";
-import { dirname, extname, join, resolve, sep } from "node:path";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright-core";
 import { analisarRegras, coletarElementos } from "./ui-rules.mjs";
@@ -58,21 +58,40 @@ const historias = Object.values(
   .map((e) => e.id);
 if (historias.length === 0) falhar("nenhuma história encontrada em index.json");
 
+// O servidor só entrega arquivos que existiam em `storybook-static/` quando ele subiu:
+// o caminho lido do disco vem sempre deste índice, nunca da URL. Assim não há dado
+// do pedido numa expressão de caminho (e nem travessia possível).
+function indexarArquivos(dir, prefixo = "") {
+  const mapa = new Map();
+  for (const entrada of readdirSync(dir, { withFileTypes: true })) {
+    const rota = `${prefixo}/${entrada.name}`;
+    const completo = join(dir, entrada.name);
+    if (entrada.isDirectory()) {
+      for (const [r, c] of indexarArquivos(completo, rota)) mapa.set(r, c);
+    } else {
+      mapa.set(rota, completo);
+    }
+  }
+  return mapa;
+}
+const arquivos = indexarArquivos(ESTATICO);
+
 const servidor = createServer((req, res) => {
-  let caminho = resolve(ESTATICO, `.${decodeURIComponent(req.url.split("?")[0])}`);
-  // A contenção é checada ANTES de qualquer acesso ao disco, e com o separador para
-  // não aceitar um diretório irmão de mesmo prefixo (`storybook-static-x`).
-  if (caminho !== ESTATICO && !caminho.startsWith(ESTATICO + sep)) {
+  let rota;
+  try {
+    rota = decodeURIComponent(req.url.split("?")[0]);
+  } catch {
+    res.writeHead(400).end();
+    return;
+  }
+  if (rota.endsWith("/")) rota += "index.html";
+  const arquivo = arquivos.get(rota);
+  if (arquivo === undefined) {
     res.writeHead(404).end();
     return;
   }
-  if (existsSync(caminho) && statSync(caminho).isDirectory()) caminho = join(caminho, "index.html");
-  if (!existsSync(caminho)) {
-    res.writeHead(404).end();
-    return;
-  }
-  res.writeHead(200, { "content-type": TIPOS[extname(caminho)] ?? "application/octet-stream" });
-  res.end(readFileSync(caminho));
+  res.writeHead(200, { "content-type": TIPOS[extname(arquivo)] ?? "application/octet-stream" });
+  res.end(readFileSync(arquivo));
 });
 await new Promise((ok) => servidor.listen(0, "127.0.0.1", ok));
 const origem = `http://127.0.0.1:${servidor.address().port}`;

@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+/// <reference types="vite/client" />
 import { cleanup, render } from "@testing-library/react";
 import axe from "axe-core";
 import { composeStories } from "@storybook/react";
@@ -27,7 +28,18 @@ import * as statusChip from "../src/web/src/components/StatusChip.stories.js";
  * estrutura, papéis ARIA, nomes acessíveis, rótulos e ordem de cabeçalhos.
  */
 
-const SUITES = [{ nome: "StatusChip", modulo: statusChip }];
+// Toda `*.stories.tsx` entra sozinha. Uma lista escrita à mão deixaria uma história
+// nova fora do gate sem aviso algum: esquecer de registrá-la a tornaria invisível ao Axe.
+const MODULOS = import.meta.glob<Parameters<typeof composeStories>[0]>(
+  "../src/web/src/**/*.stories.tsx",
+  {
+    eager: true,
+  },
+);
+const SUITES = Object.entries(MODULOS).map(([caminho, modulo]) => ({
+  nome: caminho.split("/").pop()?.replace(".stories.tsx", "") ?? caminho,
+  modulo,
+}));
 
 /** Regras inertes em jsdom. Declaradas para não produzirem passagem por vacuidade. */
 const SEM_LAYOUT = ["color-contrast"];
@@ -35,10 +47,17 @@ const SEM_LAYOUT = ["color-contrast"];
 afterEach(cleanup);
 
 describe("Axe-core por história", () => {
+  it("descobre as histórias — zero módulos varridos aprovaria por vacuidade", () => {
+    expect(SUITES.map((s) => s.nome)).toEqual(expect.arrayContaining(["Botao", "StatusChip"]));
+  });
+
   for (const { nome, modulo } of SUITES) {
     const historias = composeStories(modulo);
 
-    for (const [titulo, Historia] of Object.entries(historias)) {
+    // `composeStories` devolve componentes; o genérico aberto do glob faz o `tsc` do editor
+    // perder o tipo, e o ESLint (que é o gate) não. A asserção via `unknown` serve aos dois.
+    const componentes = Object.entries(historias) as unknown as [string, React.ComponentType][];
+    for (const [titulo, Historia] of componentes) {
       it(`${nome}/${titulo}`, async () => {
         const { container } = render(<Historia />);
 

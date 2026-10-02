@@ -208,6 +208,8 @@ StyleDictionary.registerFormat({
       lineHeight: {},
       boxShadow: {},
       backgroundImage: {},
+      outlineWidth: {},
+      outlineOffset: {},
     };
 
     const papeisDeTema = new Set();
@@ -250,6 +252,11 @@ StyleDictionary.registerFormat({
           // Entram em `spacing` para ficarem disponíveis como w-/h-/p-/m-, que é onde
           // uma medida de layout é efetivamente usada.
           secoes.spacing[[raiz, ...resto].join("-")] = ref;
+          // O anel de foco também precisa ser utilitária própria: `outline-focus` e
+          // `outline-offset-focus`. Sem isso o componente teria de escrever 3px e 2px
+          // à mão — valores que o gate 10 reprova — ou suprimir o foco.
+          if (raiz === "a11y" && resto[0] === "focus-ring-width") secoes.outlineWidth.focus = ref;
+          if (raiz === "a11y" && resto[0] === "focus-ring-offset") secoes.outlineOffset.focus = ref;
           break;
         default:
           throw new Error(`grupo de token sem destino no Tailwind: ${token.path.join(".")}`);

@@ -206,6 +206,19 @@ describe(`contraste de elemento não-textual — mínimo ${validacao.contrastLar
   }
 });
 
+describe(`contraste do botão primário — mínimo ${validacao.contrastNormalText}:1`, () => {
+  // O botão primário usa cores de MARCA (`brand.purple` com `brand.white`), que não
+  // são papéis de tema e portanto ficam fora dos pares medidos acima. Sem esta medição
+  // o contraste do componente mais usado da interface seria uma suposição — e o estado
+  // de hover (`purple-hover`, mais claro) é o que chega mais perto do limite.
+  for (const fundo of ["purple", "purple-hover"]) {
+    it(`brand.white sobre brand.${fundo}`, () => {
+      const razao = round2(contrastRatio(cor("color.brand.white"), cor(`color.brand.${fundo}`)));
+      expect(razao, `${razao}:1`).toBeGreaterThanOrEqual(TEXTO);
+    });
+  }
+});
+
 describe("regras estruturais do arquivo de tokens", () => {
   it("nenhuma cor de prioridade é o único portador da informação", () => {
     // ADR-005 e história 11.7: a cor distingue, mas não informa sozinha. O teste é

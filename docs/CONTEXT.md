@@ -29,7 +29,8 @@ Plataforma cloud-native de **ESM/ITSM** (Enterprise & IT Service Management), mu
 | **Contexto transacional**       | `withRequestContext` aplica claims com `SET LOCAL`, de modo que morram no commit e não vazem para a próxima requisição da mesma conexão de pool                                                               |
 | **Contrato OpenAPI**            | `docs/api/openapi.json` derivado dos schemas Zod, com gate 6 verificando drift                                                                                                                                |
 | **Design tokens**               | `design-system/build.mjs` compila `tokens.json` em `dist/tokens.css` e `dist/tailwind-theme.js` (Style Dictionary v4, ADR-011)                                                                                |
-| **Interface**                   | Storybook com `addon-a11y`, primeiro componente consumindo os tokens compilados (ADR-005, ADR-011)                                                                                                            |
+| **Interface**                   | Storybook com `addon-a11y`, Tailwind ligado aos tokens (`src/web/src/index.css` + `postcss.config.mjs`), primeiro componente consumindo as classes geradas (ADR-005, ADR-011)                                 |
+| **Fontes**                      | Outfit e JetBrains Mono (SIL OFL) servidas pela própria aplicação: 4 WOFF2 variáveis em `design-system/fonts/`, manifesto com SHA-256, `@font-face` gerado e validado pelo build (ADR-020, história 11.6)     |
 | **Fila assíncrona**             | `notifications` em pgmq, publicação transacional por `app.publish_event`, consumidor idempotente com DLQ (ADR-002)                                                                                            |
 | **Probes do worker**            | `src/workers/src/probes.ts` — as três probes de `@ifix/shared` (`health.ts`/`probes.ts`, promovidas do `src/api`) num `node:http` próprio, porta 3001                                                         |
 | **Empacotamento**               | `Dockerfile` multi-estágio para Distroless, `nonroot`, sem devDependencies nem fontes TS na imagem final; um único arquivo produz `ifix-api` e `ifix-workers` (`--target runtime-api`/`runtime-workers`)      |
@@ -92,6 +93,14 @@ Enquanto `src/web/` estiver vazio, a segunda metade varre **zero arquivo** e pas
 
 Dispensa pontual existe com `tokens-exempt: <motivo>` na linha. O motivo é obrigatório e verificado — `tokens-exempt:` sozinho não silencia.
 
+### O que a vitrine passou a provar (história 11.6)
+
+Ao servir as fontes, apareceu que o Tailwind **nunca tinha sido ligado** ao Storybook: sem `postcss.config` nem `@tailwind`, o CSS emitido tinha zero utilitárias e a vitrine renderizava o componente sem estilo — o Axe da 11.5 vinha rodando sobre marcação crua. Corrigido junto, e verificado num Chromium real: Outfit e JetBrains Mono em `loaded`, o componente computando `Outfit, system-ui, sans-serif`, o chip com fundo e texto de cores diferentes nos dois temas, e **zero requisições fora de localhost**.
+
+O segundo defeito apareceu logo em seguida: as classes de cor do `StatusChip` eram montadas por interpolação, que o Tailwind não enxerga, então nenhuma existia no CSS. O gate 10 ganhou a regra `classe-interpolada`. Ver a entrada de 2026-10-02 em `docs/PLAYBOOKS/INCIDENTS_LEARNING.md`.
+
+A verificação no navegador foi manual e pontual — o repositório não tem Playwright, e adicioná-lo à esteira é uma decisão à parte. O que fica na esteira são as suítes que a sustentam: `tests/fonts.test.ts` e `tokens:check` (que agora cobre `fonts.css`).
+
 ### Ressalva sobre o Dockerfile
 
 Este ambiente de desenvolvimento não tem daemon Docker, então a imagem **não é construída aqui**. O que se verifica localmente é o layout de runtime, simulado em diretório separado (`npm ci --omit=dev` + `dist` copiado): o processo sobe, responde às três probes e encerra com SIGTERM. Isso agora vale para os dois alvos — `runtime-api` e `runtime-workers` — não só para a API.
@@ -112,11 +121,17 @@ trivy image --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed gcr.io/dis
 
 ### Próximos passos imediatos (Fase 0)
 
-1. **OpenTelemetry completo** (ADR-008): o `trace-id` já vira `reqId` do Fastify e chega à auditoria pela GUC `app.trace_id`; falta o SDK com exportador OTLP — **bloqueado pelo R6**, que define o destino.
-2. **Roteamento por canal** do worker de notificações (História 10.1): o consumidor já exerce o padrão completo (envelope validado, idempotência, contexto de locatário); falta o provedor real, **bloqueado pelo R5**.
-3. **`charts/infra`**: só `README.md` até o R9 (modelo de entrega) decidir se o Postgres/GoTrue/Realtime do Supabase Self-Hosted são geridos por este monorepo ou pelo chart oficial.
+1. **Roteamento por canal** do worker de notificações (História 10.1): o consumidor já exerce o padrão completo (envelope validado, idempotência, contexto de locatário); falta o provedor real, **bloqueado pelo R5**.
+2. **`charts/infra`**: só `README.md` até o R9 (modelo de entrega) decidir se o Postgres/GoTrue/Realtime do Supabase Self-Hosted são geridos por este monorepo ou pelo chart oficial.
+3. **Restante do Épico 11:** história 11.7 (alvo de 44×44 px e limite de gradiente por tela) — as duas regras ainda sem verificação automática.
 
-**Marco de saída da Fase 0:** um endpoint em produção com RLS ativa, auditoria disparando, trace atravessando a fila e token de UI aplicado — ponta a ponta.
+### Adiado para o fim do projeto: OpenTelemetry
+
+**Decisão do dono do produto em 2026-10-02:** o SDK OpenTelemetry com exportador OTLP (ADR-008, história 12.1) e os painéis de _golden signals_ (12.2) ficam para o fim do projeto, quando o **R6** (destino de exportação) for decidido. O que já existe segue valendo: o `trace_id` vira `reqId` do Fastify, atravessa a fila dentro do envelope e chega à auditoria pela GUC `app.trace_id`. O que falta é o SDK, o exportador e o consumo no destino.
+
+Consequência registrada, não escondida: o **marco de saída da Fase 0** inclui "trace atravessando a fila", e esse trecho não fecha até lá. A Fase 0 está tecnicamente concluída sem ele; as histórias 12.1 e 12.2 continuam abertas e devem ser reavaliadas antes do GA, porque a imagem Distroless não tem shell (ADR-001) e a instrumentação é a **única** via de diagnóstico em produção. Adiar é uma decisão de ordem de trabalho, não uma mudança nessa premissa.
+
+**Marco de saída da Fase 0:** um endpoint em produção com RLS ativa, auditoria disparando, trace atravessando a fila e token de UI aplicado — ponta a ponta. _(O trecho do trace aguarda o OpenTelemetry, adiado acima.)_
 
 ### Como rodar localmente
 
@@ -233,7 +248,7 @@ Texto completo e o gate de CI correspondente a cada uma: § 10.1 da especificaç
 10 riscos e decisões em aberto (R2–R11) na § 12 da especificação; os encerrados ficam registrados na § 12.1. Os que bloqueiam a Fase 0:
 
 - **R3** — política de retenção e base legal LGPD por categoria de dado (classificação precisa existir antes do primeiro schema com dado pessoal).
-- **R6** — destino de exportação da observabilidade (coletor OTLP).
+- **R6** — destino de exportação da observabilidade (coletor OTLP). _Adiado para o fim do projeto (2026-10-02): deixou de bloquear a Fase 0, mas segue aberto e bloqueia 12.1, 12.2 e o `charts/infra`._
 - **R11** — licença do repositório.
 
 ## 10. Referências

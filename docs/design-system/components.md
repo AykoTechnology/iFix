@@ -15,6 +15,8 @@ Transcrito da seção 05 do handoff (`iFix Design System.dc.html`). Cada compone
 
 Regra: alvo mínimo 44×44px, foco visível de 3px em todos os estados.
 
+**Implementado:** primário, secundário, terciário e desabilitado (`src/web/src/components/Botao.tsx`), com alvo e foco vindos dos tokens e verificados por `npm run ui:rules`. **Pendentes:** destrutivo e pequeno.
+
 ## Campos de formulário
 
 - Rótulo sempre acima do campo, associado via `for`/`id` (nunca placeholder-only).

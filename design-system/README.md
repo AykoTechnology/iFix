@@ -30,14 +30,22 @@ O pipeline roda no build e na esteira de CI. **A saída não é editada manualme
 4. Tema claro e escuro são pares de token no mesmo arquivo (`color.theme.dark` / `color.theme.light`). Nenhum componente decide qual tema está ativo — consome a variável resolvida.
 5. A validação de contraste WCAG 2.2 AA roda sobre **ambos** os temas na esteira (Épico 11.4). Falha bloqueia o merge.
 
-## Regras que a ferramenta não detecta
+## Regras que o Axe não detecta (Épico 11.7)
 
-O Axe-core e o validador de contraste não capturam as violações mais caras deste produto. Estas exigem revisão manual registrada no PR (Épico 11.7):
+O Axe e o validador de contraste não capturam as violações mais caras deste produto. Três delas são verificadas por `npm run ui:rules`, que abre **cada história do Storybook compilado**, nos dois temas, num navegador real e mede o que foi renderizado. A análise é uma função pura (`scripts/ui-rules.mjs`) provada com fixtures em `tests/ui-rules.test.ts`.
 
-- **Cor nunca é o único portador de informação** — prioridade, SLA e estado sempre acompanham rótulo textual.
-- **Alvo mínimo de 44×44 px** para qualquer elemento clicável, inclusive ícones do rail de navegação e ações de linha na fila (a área de toque pode exceder o tamanho visual do chip).
-- **Gradiente de marca:** um único destaque por tela. Proibido em fundo de fila, texto corrido, alerta de incidente massivo e botão destrutivo.
-- **Foco visível nunca suprimido** — `outline: none` sem substituto equivalente é reprovação automática.
+| Regra                                          | O que é verificado                                                                                                                                                                                           | O que **não** é verificado                                                                                                                   |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Alvo mínimo de 44×44 px**                    | Todo elemento clicável mede ao menos `a11y.min-tap-target` nos dois eixos. Link dentro de texto corrido é isento (exceção do WCAG). Isenção explícita: `data-alvo-isento="motivo"` — o motivo é obrigatório. | Alvo expandido por pseudo-elemento (`::after`): a medição é da caixa do elemento. Use padding, ou a isenção com motivo.                      |
+| **Cor nunca é o único portador de informação** | Nenhum elemento visível tem fundo colorido sem texto legível nem nome acessível. O ponto decorativo é legítimo se `aria-hidden="true"`, com o rótulo ao lado.                                                | Se o texto ao lado **diz a mesma coisa** que a cor. A barra de SLA "sempre com rótulo de tempo" depende de revisão.                          |
+| **Gradiente da marca: um destaque por tela**   | O gradiente (`gradient.brand`) só aparece com `data-gradiente="marca\|navegacao\|vazio\|assistente\|destaque"`, e há no máximo um `destaque` por história.                                                   | Os contextos **proibidos** — fundo de fila, texto corrido, alerta de incidente massivo, botão destrutivo, leitura prolongada. Revisão de PR. |
+
+Duas salvaguardas contra passar por vacuidade: a cada execução uma página deliberadamente errada precisa ser reprovada por todas as regras (controle negativo), e zero histórias ou zero elementos clicáveis medidos é erro. O navegador é o Chromium de `CHROME_PATH` ou o Google Chrome instalado (os runners do GitHub já o trazem); o `playwright-core` é só o driver.
+
+Continuam **só por revisão manual registrada no PR**:
+
+- **Foco visível nunca suprimido** — `outline: none` sem substituto equivalente é reprovação. O `Botao` usa o anel dos tokens (`outline-focus`, `outline-offset-focus`, `outline-focus-ring`), mas nada impede um componente futuro de suprimi-lo.
+- **Navegação por teclado e leitor de tela** — ordem de foco e anúncios que nenhuma ferramenta valida.
 
 ## Tipografia (ADR-020)
 

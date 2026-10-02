@@ -123,6 +123,12 @@ export const ifixTheme = {
   },
   "backgroundImage": {
     "brand": "var(--gradient-brand)"
+  },
+  "outlineWidth": {
+    "focus": "var(--a11y-focus-ring-width)"
+  },
+  "outlineOffset": {
+    "focus": "var(--a11y-focus-ring-offset)"
   }
 };
 

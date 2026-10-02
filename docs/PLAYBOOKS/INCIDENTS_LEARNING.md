@@ -18,6 +18,18 @@ Toda entrada nova é adicionada ao **topo** da lista (mais recente primeiro). Ne
 
 ---
 
+### 2026-10-02 — Uma regra sem nada para medir passa; e uma lista escrita à mão esconde o que ficou de fora
+
+- **Sintoma**: nenhum. Encontrado ao desenhar a verificação da 11.7 (alvo de 44×44 px, cor sem texto, gradiente): o único componente da interface era o `StatusChip`, que não é clicável e não usa gradiente. Qualquer regra escrita naquele momento teria saído verde — e continuaria verde para sempre.
+- **Causa-raiz (1)**: um verificador só prova algo quando existe pelo menos um objeto que ele poderia reprovar. A § 6.4 e o ADR-005 declaravam as regras desde a v1.0; ninguém havia perguntado "medidas em quê?".
+- **Causa-raiz (2)**: `tests/a11y.test.tsx` listava as suítes de histórias à mão (`const SUITES = [...]`). Uma história nova, ou um arquivo novo, que esquecesse de se registrar ali ficaria fora do Axe sem erro nem aviso — o mesmo defeito que as outras entradas deste playbook descrevem, num lugar que ninguém havia olhado.
+- **Mitigação aplicada**: o `Botao` entrou como sujeito real (e o gate falha se medir zero elementos clicáveis); a verificação roda num navegador real sobre cada história, com um controle negativo que precisa ser reprovado por todas as regras a cada execução; a suíte do Axe passou a descobrir as histórias por glob e a exigir que `Botao` e `StatusChip` estejam entre elas. Cada regra foi vista reprovando contra o render real: sem o token de alvo o botão mede 98,9×38,5 px; sem `aria-hidden` o ponto colorido é reprovado; dois destaques e gradiente sem papel são reprovados.
+- **Regras novas**:
+  1. **Antes de escrever uma regra, nomear o que ela vai medir.** Se não existe, construir o sujeito primeiro (ou o gate falha ao medir zero), e registrar no log quando uma regra ainda não tem o que medir — como os "0 gradientes" desta execução.
+  2. **Lista de itens a verificar é descoberta, não digitada.** Glob em vez de array; e um teste que exige que itens conhecidos estejam na descoberta, para o glob quebrado não virar lista vazia.
+  3. **O que o gate não cobre fica escrito ao lado da regra** (`design-system/README.md`), com o que continua sendo revisão manual.
+- **Referência**: `scripts/ui-rules.mjs`, `scripts/check-ui-rules.mjs`, `tests/ui-rules.test.ts`, `tests/a11y.test.tsx`, história 11.7 (#11).
+
 ### 2026-10-02 — A vitrine nunca renderizou com estilo, e o Axe rodava sobre marcação crua
 
 - **Sintoma**: nenhum na esteira. Descoberto ao tentar provar que as fontes da 11.6 chegavam à tela: num Chromium real, o componente computava `Times New Roman`, e o CSS emitido pelo Storybook tinha **zero** classes utilitárias.

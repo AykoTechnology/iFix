@@ -18,25 +18,26 @@ Plataforma cloud-native de **ESM/ITSM** (Enterprise & IT Service Management), mu
 
 ### Módulos concluídos
 
-| Módulo                          | Entregue                                                                                                                                                                                                      |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Padrão de referência de RLS** | `supabase/migrations/20260922000001_foundation.sql` — tenancy em dois eixos, auditoria imutável, UUID v7. É o formato que toda migração futura copia.                                                         |
-| **Trilha de auditoria**         | `audit.logs` particionada, captura por gatilho, imutável por privilégio **e** por gatilho (resiste a superusuário)                                                                                            |
-| **Suíte de vazamento**          | 23 testes contra PostgreSQL real, verificados por mutação — cada teste foi visto falhando quando a proteção que afirma verificar é removida                                                                   |
-| **Tooling do monorepo**         | npm workspaces, TypeScript estrito, ESLint (com as regras que sustentam as Regras de Ouro 7 e 11), Prettier, Vitest                                                                                           |
-| **Contrato de claims**          | `src/shared` — `jwtClaimsSchema` é o contrato entre autenticação e políticas RLS, validado antes de virar GUC                                                                                                 |
-| **API HTTP**                    | `src/api` — Fastify, as três probes da § 6.3, autenticação JWT, `GET /v1/people` e graceful shutdown em 25s                                                                                                   |
-| **Contexto transacional**       | `withRequestContext` aplica claims com `SET LOCAL`, de modo que morram no commit e não vazem para a próxima requisição da mesma conexão de pool                                                               |
-| **Contrato OpenAPI**            | `docs/api/openapi.json` derivado dos schemas Zod, com gate 6 verificando drift                                                                                                                                |
-| **Design tokens**               | `design-system/build.mjs` compila `tokens.json` em `dist/tokens.css` e `dist/tailwind-theme.js` (Style Dictionary v4, ADR-011)                                                                                |
-| **Interface**                   | Storybook com `addon-a11y`, Tailwind ligado aos tokens (`src/web/src/index.css` + `postcss.config.mjs`), primeiro componente consumindo as classes geradas (ADR-005, ADR-011)                                 |
-| **Fontes**                      | Outfit e JetBrains Mono (SIL OFL) servidas pela própria aplicação: 4 WOFF2 variáveis em `design-system/fonts/`, manifesto com SHA-256, `@font-face` gerado e validado pelo build (ADR-020, história 11.6)     |
-| **Fila assíncrona**             | `notifications` em pgmq, publicação transacional por `app.publish_event`, consumidor idempotente com DLQ (ADR-002)                                                                                            |
-| **Probes do worker**            | `src/workers/src/probes.ts` — as três probes de `@ifix/shared` (`health.ts`/`probes.ts`, promovidas do `src/api`) num `node:http` próprio, porta 3001                                                         |
-| **Empacotamento**               | `Dockerfile` multi-estágio para Distroless, `nonroot`, sem devDependencies nem fontes TS na imagem final; um único arquivo produz `ifix-api` e `ifix-workers` (`--target runtime-api`/`runtime-workers`)      |
-| **Charts Helm**                 | `charts/api` e `charts/workers` — PSS Restricted, três probes, orçamento de encerramento verificado (preStop + `SHUTDOWN_TIMEOUT_MS` + margem ≤ 30s), HPA (api) e KEDA por fila `pgmq` (workers, sem preStop) |
-| **Esteira de CI**               | `.github/workflows/` com os gates 1, 2, 3, 4, 5, 6, 8, 9, 11 e 12 ativos                                                                                                                                      |
-| **Graceful shutdown**           | Provado contra o artefato **compilado**: SIGTERM e SIGINT saem com código 0, drenam e registram no log (Regra de Ouro 8)                                                                                      |
+| Módulo                          | Entregue                                                                                                                                                                                                                                                         |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Padrão de referência de RLS** | `supabase/migrations/20260922000001_foundation.sql` — tenancy em dois eixos, auditoria imutável, UUID v7. É o formato que toda migração futura copia.                                                                                                            |
+| **Trilha de auditoria**         | `audit.logs` particionada, captura por gatilho, imutável por privilégio **e** por gatilho (resiste a superusuário)                                                                                                                                               |
+| **Suíte de vazamento**          | 23 testes contra PostgreSQL real, verificados por mutação — cada teste foi visto falhando quando a proteção que afirma verificar é removida                                                                                                                      |
+| **Tooling do monorepo**         | npm workspaces, TypeScript estrito, ESLint (com as regras que sustentam as Regras de Ouro 7 e 11), Prettier, Vitest                                                                                                                                              |
+| **Contrato de claims**          | `src/shared` — `jwtClaimsSchema` é o contrato entre autenticação e políticas RLS, validado antes de virar GUC                                                                                                                                                    |
+| **API HTTP**                    | `src/api` — Fastify, as três probes da § 6.3, autenticação JWT, `GET /v1/people` e graceful shutdown em 25s                                                                                                                                                      |
+| **Contexto transacional**       | `withRequestContext` aplica claims com `SET LOCAL`, de modo que morram no commit e não vazem para a próxima requisição da mesma conexão de pool                                                                                                                  |
+| **Contrato OpenAPI**            | `docs/api/openapi.json` derivado dos schemas Zod, com gate 6 verificando drift                                                                                                                                                                                   |
+| **Design tokens**               | `design-system/build.mjs` compila `tokens.json` em `dist/tokens.css` e `dist/tailwind-theme.js` (Style Dictionary v4, ADR-011)                                                                                                                                   |
+| **Interface**                   | Storybook com `addon-a11y`, Tailwind ligado aos tokens (`src/web/src/index.css` + `postcss.config.mjs`), primeiro componente consumindo as classes geradas (ADR-005, ADR-011)                                                                                    |
+| **Fontes**                      | Outfit e JetBrains Mono (SIL OFL) servidas pela própria aplicação: 4 WOFF2 variáveis em `design-system/fonts/`, manifesto com SHA-256, `@font-face` gerado e validado pelo build (ADR-020, história 11.6)                                                        |
+| **Regras de produto**           | `npm run ui:rules` mede, num navegador real e sobre cada história nos dois temas, o alvo mínimo de 44×44 px, a cor nunca como único portador de informação e o gradiente da marca limitado a um destaque (história 11.7); `Botao` é o primeiro elemento clicável |
+| **Fila assíncrona**             | `notifications` em pgmq, publicação transacional por `app.publish_event`, consumidor idempotente com DLQ (ADR-002)                                                                                                                                               |
+| **Probes do worker**            | `src/workers/src/probes.ts` — as três probes de `@ifix/shared` (`health.ts`/`probes.ts`, promovidas do `src/api`) num `node:http` próprio, porta 3001                                                                                                            |
+| **Empacotamento**               | `Dockerfile` multi-estágio para Distroless, `nonroot`, sem devDependencies nem fontes TS na imagem final; um único arquivo produz `ifix-api` e `ifix-workers` (`--target runtime-api`/`runtime-workers`)                                                         |
+| **Charts Helm**                 | `charts/api` e `charts/workers` — PSS Restricted, três probes, orçamento de encerramento verificado (preStop + `SHUTDOWN_TIMEOUT_MS` + margem ≤ 30s), HPA (api) e KEDA por fila `pgmq` (workers, sem preStop)                                                    |
+| **Esteira de CI**               | `.github/workflows/` com os gates 1, 2, 3, 4, 5, 6, 8, 9, 11 e 12 ativos                                                                                                                                                                                         |
+| **Graceful shutdown**           | Provado contra o artefato **compilado**: SIGTERM e SIGINT saem com código 0, drenam e registram no log (Regra de Ouro 8)                                                                                                                                         |
 
 ### Estado dos 12 gates da esteira (§ 6.4)
 
@@ -101,6 +102,16 @@ O segundo defeito apareceu logo em seguida: as classes de cor do `StatusChip` er
 
 A verificação no navegador foi manual e pontual — o repositório não tem Playwright, e adicioná-lo à esteira é uma decisão à parte. O que fica na esteira são as suítes que a sustentam: `tests/fonts.test.ts` e `tokens:check` (que agora cobre `fonts.css`).
 
+### As regras de produto são medidas, não presumidas (história 11.7)
+
+`npm run ui:rules` abre cada história do Storybook compilado num navegador real e mede o que foi renderizado. É a primeira verificação do repositório que olha pixels, e existe porque as três regras — alvo de 44×44 px, cor nunca como único portador de informação, um destaque de gradiente por tela — dependem de layout e de estilo computado, que o Axe em jsdom não tem. A análise é pura e provada por fixtures (`tests/ui-rules.test.ts`); só a coleta roda na página.
+
+**O limite está escrito no `design-system/README.md`, não escondido:** o gate não verifica os contextos _proibidos_ do gradiente (fundo de fila, texto corrido, alerta massivo, botão destrutivo), nem se o texto ao lado de uma cor diz a mesma coisa que ela, nem alvo expandido por pseudo-elemento. Isso continua sendo revisão de PR.
+
+Sem sujeito a regra seria vacuamente verde — o único componente era o `StatusChip`, que não é clicável. Por isso entrou o `Botao`, e por isso o gate falha se medir **zero** elementos clicáveis. Hoje nenhum componente usa o gradiente: as regras de gradiente são provadas por fixtures e por uma história temporária (já removida), e o gate registra "0 gradientes" no log em vez de fingir cobertura.
+
+A suíte de acessibilidade (`tests/a11y.test.tsx`) também mudou: as histórias eram listadas à mão, e uma história nova esquecida na lista ficaria fora do Axe sem aviso. Agora toda `*.stories.tsx` entra sozinha.
+
 ### Ressalva sobre o Dockerfile
 
 Este ambiente de desenvolvimento não tem daemon Docker, então a imagem **não é construída aqui**. O que se verifica localmente é o layout de runtime, simulado em diretório separado (`npm ci --omit=dev` + `dist` copiado): o processo sobe, responde às três probes e encerra com SIGTERM. Isso agora vale para os dois alvos — `runtime-api` e `runtime-workers` — não só para a API.
@@ -123,7 +134,7 @@ trivy image --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed gcr.io/dis
 
 1. **Roteamento por canal** do worker de notificações (História 10.1): o consumidor já exerce o padrão completo (envelope validado, idempotência, contexto de locatário); falta o provedor real, **bloqueado pelo R5**.
 2. **`charts/infra`**: só `README.md` até o R9 (modelo de entrega) decidir se o Postgres/GoTrue/Realtime do Supabase Self-Hosted são geridos por este monorepo ou pelo chart oficial.
-3. **Restante do Épico 11:** história 11.7 (alvo de 44×44 px e limite de gradiente por tela) — as duas regras ainda sem verificação automática.
+3. **Preload da fonte de corpo** (11.6): depende de existir o shell da aplicação (`src/web/index.html`); o teste está pronto e fica pulado até lá.
 
 ### Adiado para o fim do projeto: OpenTelemetry
 
